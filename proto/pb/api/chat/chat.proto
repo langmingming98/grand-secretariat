@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package api;
+
+import "pb/shared/content.proto";
+
+service Chat {
+    
+  rpc Chat(ChatRequest) returns (stream ChatResponse) {}
+
+}
+
+message ChatRequest {
+  repeated shared.Message messages = 1;
+  repeated string models = 2;
+  optional uint32 max_tokens = 3;
+}
+
+message ChatResponse {
+  // request id
+  string id = 1;
+  uint64 timestamp = 2;
+  string model = 3;
+  shared.Delta delta = 4;
+}
