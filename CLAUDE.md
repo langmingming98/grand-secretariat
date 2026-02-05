@@ -4,7 +4,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Grand-Secretariat is a multi-model chat application that streams responses from multiple AI models in parallel. It uses a microservices architecture: Next.js frontend → FastAPI WebSocket gateway → gRPC chat service → OpenRouter API.
+**Grand Secretariat (内阁)** - Named after the consulting cabinet to Ming dynasty emperors. A collaborative workspace where multiple humans and LLMs work together in real-time.
+
+**Current state:** Basic multi-model chat working. Now building room-based collaboration with @mentions, threading, and real-time presence.
+
+**Key docs:**
+- `docs/PRODUCT_SPEC.md` - Product requirements and user stories
+- `docs/TECH_DESIGN.md` - Architecture, WebSocket protocol, schemas
+- `docs/TECHNICAL_PLAN.md` - Implementation phases and progress
+
+## Architecture
+
+Next.js frontend → FastAPI WebSocket gateway → gRPC chat service → OpenRouter API
+                         ↓
+                   Redis (real-time state) + DynamoDB (persistence)
 
 ## Common Commands
 
