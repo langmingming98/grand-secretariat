@@ -132,5 +132,8 @@ jobs:
             sudo -E docker compose -f docker-compose.prod.yml pull
             sudo -E docker compose -f docker-compose.prod.yml up -d
 
+            # Restart nginx to pick up new container IPs
+            sudo docker compose -f docker-compose.prod.yml restart nginx
+
             # Cleanup old images
             sudo docker image prune -f
