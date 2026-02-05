@@ -43,10 +43,21 @@ export function useWebSocket(models: string[]) {
     )
     setIsStreaming(true)
 
-    // Connect to WebSocket (use wss:// for HTTPS, go through nginx)
-    const protocol = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const host = typeof window !== 'undefined' ? window.location.host : 'localhost:8000'
-    const wsUrl = `${protocol}//${host}/ws/chat/stream`
+    // Connect to WebSocket
+    // - Production (HTTPS): wss:// through nginx on same host
+    // - Local dev (HTTP on :3000): ws:// directly to gateway on :8000
+    let wsUrl: string
+    if (typeof window !== 'undefined') {
+      const isLocalDev = window.location.hostname === 'localhost' && window.location.port === '3000'
+      if (isLocalDev) {
+        wsUrl = 'ws://localhost:8000/ws/chat/stream'
+      } else {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+        wsUrl = `${protocol}//${window.location.host}/ws/chat/stream`
+      }
+    } else {
+      wsUrl = 'ws://localhost:8000/ws/chat/stream'
+    }
     const ws = new WebSocket(wsUrl)
 
     ws.onopen = () => {
