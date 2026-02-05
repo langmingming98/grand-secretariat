@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Multi-Model Chat',
+  title: 'Claude Took Over Human',
   description: 'Stream responses from multiple AI models in parallel',
 }
 

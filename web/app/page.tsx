@@ -27,7 +27,7 @@ export default function Home() {
   return (
     <div className="min-h-screen flex flex-col p-4 gap-4">
       <header className="text-2xl font-bold text-center text-blue-400 mb-2">
-        Multi-Model Chat
+        Claude Took Over Human
       </header>
       
       <div className="flex-1 grid grid-cols-2 grid-rows-2 gap-4 min-h-0">
