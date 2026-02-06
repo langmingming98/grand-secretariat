@@ -127,7 +127,11 @@ class MemoryStore:
         role: room_pb2.Role.ValueType,
     ) -> StoredParticipant:
         key = (room_id, user_id)
-        if key not in self._participants:
+        if key in self._participants:
+            # Update display name on rejoin
+            self._participants[key].display_name = display_name
+            self._participants[key].role = role
+        else:
             self._participants[key] = StoredParticipant(
                 user_id=user_id,
                 room_id=room_id,

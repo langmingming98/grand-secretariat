@@ -50,6 +50,26 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      # Room service
+      - name: Extract metadata for room
+        id: meta-room
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/room
+          tags: |
+            type=sha,prefix=
+            type=raw,value=latest
+
+      - name: Build and push room
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: services/room/Dockerfile
+          push: true
+          tags: ${{ steps.meta-room.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
       # Gateway service
       - name: Extract metadata for gateway
         id: meta-gateway
