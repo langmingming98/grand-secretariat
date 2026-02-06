@@ -3,115 +3,127 @@ name: Build and Deploy
 on:
   push:
     branches: [main]
-  workflow_dispatch:  # Manual trigger
+  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
   IMAGE_PREFIX: ${{ github.repository }}
 
 jobs:
-  build-and-push:
+  # ---- Parallel builds ----
+
+  build-chat:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-
+    permissions: { contents: read, packages: write }
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      # Chat service
-      - name: Extract metadata for chat
-        id: meta-chat
-        uses: docker/metadata-action@v5
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/metadata-action@v5
+        id: meta
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/chat
           tags: |
             type=sha,prefix=
             type=raw,value=latest
-
-      - name: Build and push chat
-        uses: docker/build-push-action@v5
+      - uses: docker/build-push-action@v5
         with:
           context: .
           file: services/chat/Dockerfile
           push: true
-          tags: ${{ steps.meta-chat.outputs.tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha,scope=chat
+          cache-to: type=gha,scope=chat,mode=max
 
-      # Room service
-      - name: Extract metadata for room
-        id: meta-room
-        uses: docker/metadata-action@v5
+  build-room:
+    runs-on: ubuntu-latest
+    permissions: { contents: read, packages: write }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/metadata-action@v5
+        id: meta
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/room
           tags: |
             type=sha,prefix=
             type=raw,value=latest
-
-      - name: Build and push room
-        uses: docker/build-push-action@v5
+      - uses: docker/build-push-action@v5
         with:
           context: .
           file: services/room/Dockerfile
           push: true
-          tags: ${{ steps.meta-room.outputs.tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha,scope=room
+          cache-to: type=gha,scope=room,mode=max
 
-      # Gateway service
-      - name: Extract metadata for gateway
-        id: meta-gateway
-        uses: docker/metadata-action@v5
+  build-gateway:
+    runs-on: ubuntu-latest
+    permissions: { contents: read, packages: write }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/metadata-action@v5
+        id: meta
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/gateway
           tags: |
             type=sha,prefix=
             type=raw,value=latest
-
-      - name: Build and push gateway
-        uses: docker/build-push-action@v5
+      - uses: docker/build-push-action@v5
         with:
           context: .
           file: services/gateway/Dockerfile
           push: true
-          tags: ${{ steps.meta-gateway.outputs.tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha,scope=gateway
+          cache-to: type=gha,scope=gateway,mode=max
 
-      # Web frontend
-      - name: Extract metadata for web
-        id: meta-web
-        uses: docker/metadata-action@v5
+  build-web:
+    runs-on: ubuntu-latest
+    permissions: { contents: read, packages: write }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/metadata-action@v5
+        id: meta
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/web
           tags: |
             type=sha,prefix=
             type=raw,value=latest
-
-      - name: Build and push web
-        uses: docker/build-push-action@v5
+      - uses: docker/build-push-action@v5
         with:
           context: ./web
           file: web/Dockerfile
           push: true
-          tags: ${{ steps.meta-web.outputs.tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,scope=web,mode=max
+
+  # ---- Deploy after all builds complete ----
 
   deploy:
-    needs: build-and-push
+    needs: [build-chat, build-room, build-gateway, build-web]
     runs-on: ubuntu-latest
 
     steps:
