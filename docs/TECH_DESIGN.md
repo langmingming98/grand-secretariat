@@ -412,7 +412,21 @@ conn:{connection_id}           HASH    {user_id, room_id, connected_at}
 
 ---
 
-## Proto Definitions (New)
+## Proto Definitions
+
+Source of truth: `proto/pb/api/room/room.proto`
+
+### Key design decisions (from review)
+
+- **Enums over strings** for `ParticipantType` (HUMAN/LLM) and `Role` (ADMIN/MEMBER/VIEWER)
+- **`LLMConfig.id`** added as stable identifier (distinct from display_name)
+- **`RoomInfo`** extracted as shared message (used by RoomState, GetRoomResponse, ListRoomsResponse)
+- **`google.protobuf.Timestamp`** instead of raw uint64
+- **`message_id`** consistently used (not `id`) across Message, LLMChunk, LLMDone
+- **`ListRooms` / `LoadHistory`** RPCs added with cursor-based pagination
+- **`Ping`/`Pong`** added for application-level keepalive
+- **`InterruptLLM.message_id`** added to disambiguate concurrent LLM responses
+- **1 stream = 1 room** invariant: JoinRoom must be first ClientMessage on stream
 
 ### room.proto
 ```protobuf
@@ -420,39 +434,96 @@ service Room {
   // Unary RPCs
   rpc CreateRoom(CreateRoomRequest) returns (CreateRoomResponse);
   rpc GetRoom(GetRoomRequest) returns (GetRoomResponse);
+  rpc ListRooms(ListRoomsRequest) returns (ListRoomsResponse);
+  rpc LoadHistory(LoadHistoryRequest) returns (LoadHistoryResponse);
 
   // Bidirectional streaming - main session
+  // One stream per room per user. JoinRoom must be the first ClientMessage.
   rpc RoomSession(stream ClientMessage) returns (stream ServerEvent);
 }
 
-// --- Unary Messages ---
+enum ParticipantType {
+  PARTICIPANT_TYPE_UNSPECIFIED = 0;
+  HUMAN = 1;
+  LLM = 2;
+}
+
+enum Role {
+  ROLE_UNSPECIFIED = 0;
+  ADMIN = 1;
+  MEMBER = 2;
+  VIEWER = 3;
+}
 
 message LLMConfig {
-  string model = 1;
-  string persona = 2;
-  string display_name = 3;
+  string id = 1;              // stable identifier, e.g. "claude-1"
+  string model = 2;           // OpenRouter model id
+  string persona = 3;         // system prompt / role description
+  string display_name = 4;    // human-readable, e.g. "Claude"
 }
+
+message Participant {
+  string id = 1;
+  string name = 2;
+  Role role = 3;
+  ParticipantType type = 4;
+}
+
+message RoomInfo {
+  string room_id = 1;
+  string name = 2;
+  google.protobuf.Timestamp created_at = 3;
+  string created_by = 4;
+  repeated LLMConfig llms = 5;
+}
+
+message Message {
+  string message_id = 1;
+  string sender_id = 2;
+  string sender_name = 3;
+  ParticipantType sender_type = 4;
+  string content = 5;
+  optional string reply_to = 6;
+  google.protobuf.Timestamp timestamp = 7;
+}
+
+// --- Unary RPCs ---
 
 message CreateRoomRequest {
   string name = 1;
   repeated LLMConfig llms = 2;
-  string created_by = 3;
+  string created_by = 3;       // from auth context in production
 }
 
-message CreateRoomResponse {
-  string room_id = 1;
-}
+message CreateRoomResponse { string room_id = 1; }
 
-message GetRoomRequest {
-  string room_id = 1;
-}
+message GetRoomRequest { string room_id = 1; }
 
 message GetRoomResponse {
+  RoomInfo room = 1;
+  repeated Participant participants = 2;
+}
+
+message ListRoomsRequest {
+  optional string user_id = 1;    // filter to user's rooms; empty = all
+  uint32 limit = 2;               // default 20
+  optional string cursor = 3;
+}
+
+message ListRoomsResponse {
+  repeated RoomInfo rooms = 1;
+  optional string next_cursor = 2;
+}
+
+message LoadHistoryRequest {
   string room_id = 1;
-  string name = 2;
-  uint64 created_at = 3;
-  int32 participant_count = 4;
-  repeated LLMConfig llms = 5;
+  uint32 limit = 2;               // default 50
+  optional string cursor = 3;     // opaque; MSG# sort key
+}
+
+message LoadHistoryResponse {
+  repeated Message messages = 1;
+  optional string next_cursor = 2;
 }
 
 // --- Bidi Stream: Client → Server ---
@@ -463,38 +534,38 @@ message ClientMessage {
     SendMessage message = 2;
     TypingIndicator typing = 3;
     InterruptLLM interrupt = 4;
-    LeaveRoom leave = 5;
+    Ping ping = 5;
   }
 }
 
 message JoinRoom {
   string room_id = 1;
-  string user_id = 2;
+  string user_id = 2;        // client-generated for anon; server validates when auth exists
   string display_name = 3;
-  string role = 4;
+  Role role = 4;
 }
 
 message SendMessage {
   string content = 1;
-  optional string reply_to = 2;  // for threading
+  repeated string mentions = 2;    // client-parsed; server re-validates against room LLMs
+  optional string reply_to = 3;
 }
 
-message TypingIndicator {
-  bool is_typing = 1;
-}
+message TypingIndicator { bool is_typing = 1; }
 
 message InterruptLLM {
   string llm_id = 1;
+  optional string message_id = 2; // disambiguate concurrent responses
 }
 
-message LeaveRoom {}
+message Ping {}
 
 // --- Bidi Stream: Server → Client ---
 
 message ServerEvent {
   oneof payload {
     RoomState room_state = 1;
-    MessageReceived message = 2;
+    MessageReceived message_received = 2;
     UserJoined user_joined = 3;
     UserLeft user_left = 4;
     LLMThinking llm_thinking = 5;
@@ -502,73 +573,27 @@ message ServerEvent {
     LLMDone llm_done = 7;
     UserTyping user_typing = 8;
     Error error = 9;
+    Pong pong = 10;
   }
 }
 
 message RoomState {
-  string room_id = 1;
-  string room_name = 2;
-  repeated Participant participants = 3;
-  repeated Message messages = 4;  // last 50
-  repeated LLMConfig llms = 5;
+  RoomInfo room = 1;
+  repeated Participant participants = 2;
+  repeated Message messages = 3;
 }
 
-message Participant {
-  string id = 1;
-  string name = 2;
-  string role = 3;
-  string type = 4;  // "human" or "llm"
-}
+message MessageReceived { Message message = 1; }
+message UserJoined { Participant user = 1; }
+message UserLeft { string user_id = 1; }
 
-message Message {
-  string id = 1;
-  string sender_id = 2;
-  string sender_name = 3;
-  string sender_type = 4;  // "human" or "llm"
-  string content = 5;
-  optional string reply_to = 6;
-  uint64 timestamp = 7;
-}
+message LLMThinking { string llm_id = 1; string reply_to = 2; }
+message LLMChunk { string message_id = 1; string llm_id = 2; string content = 3; string reply_to = 4; }
+message LLMDone { string message_id = 1; string llm_id = 2; }
 
-message MessageReceived {
-  Message message = 1;
-}
-
-message UserJoined {
-  Participant user = 1;
-}
-
-message UserLeft {
-  string user_id = 1;
-}
-
-message LLMThinking {
-  string llm_id = 1;
-  string reply_to = 2;  // which message triggered this
-}
-
-message LLMChunk {
-  string message_id = 1;  // same across all chunks
-  string llm_id = 2;
-  string content = 3;     // delta
-  string reply_to = 4;
-}
-
-message LLMDone {
-  string message_id = 1;
-  string llm_id = 2;
-}
-
-message UserTyping {
-  string user_id = 1;
-  string user_name = 2;
-  bool is_typing = 3;
-}
-
-message Error {
-  string code = 1;
-  string message = 2;
-}
+message UserTyping { string user_id = 1; string user_name = 2; bool is_typing = 3; }
+message Error { string code = 1; string message = 2; }
+message Pong {}
 ```
 
 ---

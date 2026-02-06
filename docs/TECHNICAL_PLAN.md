@@ -1,18 +1,21 @@
 # Technical Implementation Plan
 
 ## Phase 1: Foundation
-- [ ] Tech design doc (architecture, data flow, API contracts)
-- [ ] DynamoDB schema + Redis data structures
+- [x] Tech design doc (architecture, data flow, API contracts)
+- [x] DynamoDB schema + Redis data structures (designed; in-memory store for now)
 - [ ] Set up DynamoDB table (AWS)
 - [ ] Set up Redis on EC2
 
 ## Phase 2: Backend (Room Infrastructure)
-- [ ] Room service protos (CreateRoom, JoinRoom, LeaveRoom, SendMessage)
-- [ ] Gateway: persistent WebSocket with room routing
-- [ ] Connection manager (track which WebSocket → which room)
-- [ ] Message persistence to DynamoDB
-- [ ] Broadcast messages to room members
-- [ ] @mention parsing → trigger LLM via chat service
+- [x] Room service protos (CreateRoom, GetRoom, ListRooms, LoadHistory, RoomSession bidi)
+- [x] Room service implementation (in-memory store, handler registry, bidi streaming)
+- [x] Gateway: WebSocket room endpoint (`/ws/room/{id}`) + REST API (`/api/rooms`)
+- [x] Connection manager (handler registry: room → active stream handlers)
+- [x] Message persistence (in-memory; DynamoDB swap-in ready)
+- [x] Broadcast messages to room members
+- [x] @mention parsing → trigger LLM via chat service
+- [ ] Swap in DynamoDB for persistence
+- [ ] Swap in Redis for pub/sub + ephemeral state
 
 ## Phase 3: Frontend (Feature by Feature)
 - [ ] Room creation UI (select LLMs, set personas)
@@ -38,5 +41,9 @@
 - [x] CI/CD pipeline (GitHub Actions → ghcr.io → EC2)
 - [x] Local dev script (scripts/dev.sh)
 - [x] Existing multi-model chat (working but single-user, no rooms)
+- [x] Tech design doc with reviewed proto schema
+- [x] Room service (gRPC, in-memory store, bidi streaming, @mention → LLM)
+- [x] Gateway room endpoints (REST + WebSocket)
+- [x] Docker configs for room service
 
-**Next up:** Phase 1 - Tech design doc
+**Next up:** Phase 3 - Frontend room UI

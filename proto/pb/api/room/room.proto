@@ -1,0 +1,239 @@
+syntax = "proto3";
+
+package api.room;
+
+import "google/protobuf/timestamp.proto";
+
+service Room {
+  // Unary RPCs
+  rpc CreateRoom(CreateRoomRequest) returns (CreateRoomResponse);
+  rpc GetRoom(GetRoomRequest) returns (GetRoomResponse);
+  rpc ListRooms(ListRoomsRequest) returns (ListRoomsResponse);
+  rpc LoadHistory(LoadHistoryRequest) returns (LoadHistoryResponse);
+
+  // Bidirectional streaming - main session
+  // One stream per room per user. JoinRoom must be the first ClientMessage.
+  rpc RoomSession(stream ClientMessage) returns (stream ServerEvent);
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum ParticipantType {
+  PARTICIPANT_TYPE_UNSPECIFIED = 0;
+  HUMAN = 1;
+  LLM = 2;
+}
+
+enum Role {
+  ROLE_UNSPECIFIED = 0;
+  ADMIN = 1;
+  MEMBER = 2;
+  VIEWER = 3;
+}
+
+// ---------------------------------------------------------------------------
+// Shared messages
+// ---------------------------------------------------------------------------
+
+message LLMConfig {
+  string id = 1;              // stable identifier, e.g. "claude-1"
+  string model = 2;           // OpenRouter model id
+  string persona = 3;         // system prompt / role description
+  string display_name = 4;    // human-readable, e.g. "Claude"
+}
+
+message Participant {
+  string id = 1;
+  string name = 2;
+  Role role = 3;
+  ParticipantType type = 4;
+}
+
+message RoomInfo {
+  string room_id = 1;
+  string name = 2;
+  google.protobuf.Timestamp created_at = 3;
+  string created_by = 4;
+  repeated LLMConfig llms = 5;
+}
+
+message Message {
+  string message_id = 1;
+  string sender_id = 2;
+  string sender_name = 3;
+  ParticipantType sender_type = 4;
+  string content = 5;
+  optional string reply_to = 6;
+  google.protobuf.Timestamp timestamp = 7;
+}
+
+// ---------------------------------------------------------------------------
+// Unary: CreateRoom
+// ---------------------------------------------------------------------------
+
+message CreateRoomRequest {
+  string name = 1;
+  repeated LLMConfig llms = 2;
+  // created_by should come from auth context in production;
+  // passed explicitly for now while auth is not implemented.
+  string created_by = 3;
+}
+
+message CreateRoomResponse {
+  string room_id = 1;
+}
+
+// ---------------------------------------------------------------------------
+// Unary: GetRoom
+// ---------------------------------------------------------------------------
+
+message GetRoomRequest {
+  string room_id = 1;
+}
+
+message GetRoomResponse {
+  RoomInfo room = 1;
+  repeated Participant participants = 2;  // currently online
+}
+
+// ---------------------------------------------------------------------------
+// Unary: ListRooms
+// ---------------------------------------------------------------------------
+
+message ListRoomsRequest {
+  // Filter to rooms this user has joined. Empty = all rooms.
+  optional string user_id = 1;
+  uint32 limit = 2;                     // default 20
+  optional string cursor = 3;           // opaque pagination token
+}
+
+message ListRoomsResponse {
+  repeated RoomInfo rooms = 1;
+  optional string next_cursor = 2;
+}
+
+// ---------------------------------------------------------------------------
+// Unary: LoadHistory
+// ---------------------------------------------------------------------------
+
+message LoadHistoryRequest {
+  string room_id = 1;
+  uint32 limit = 2;                     // default 50
+  optional string cursor = 3;           // opaque; MSG# sort key
+}
+
+message LoadHistoryResponse {
+  repeated Message messages = 1;
+  optional string next_cursor = 2;      // null = no more history
+}
+
+// ---------------------------------------------------------------------------
+// Bidi Stream: Client → Server
+// ---------------------------------------------------------------------------
+
+message ClientMessage {
+  oneof payload {
+    JoinRoom join = 1;
+    SendMessage message = 2;
+    TypingIndicator typing = 3;
+    InterruptLLM interrupt = 4;
+    Ping ping = 5;
+  }
+}
+
+message JoinRoom {
+  string room_id = 1;
+  // user_id is client-generated for anonymous users.
+  // Server should validate / assign via auth when available.
+  string user_id = 2;
+  string display_name = 3;
+  Role role = 4;
+}
+
+message SendMessage {
+  string content = 1;
+  // Client-parsed @mentions. Server re-validates against room LLM configs.
+  repeated string mentions = 2;
+  optional string reply_to = 3;
+}
+
+message TypingIndicator {
+  bool is_typing = 1;
+}
+
+message InterruptLLM {
+  string llm_id = 1;
+  // Which response to interrupt (required when LLM has concurrent responses)
+  optional string message_id = 2;
+}
+
+message Ping {}
+
+// ---------------------------------------------------------------------------
+// Bidi Stream: Server → Client
+// ---------------------------------------------------------------------------
+
+message ServerEvent {
+  oneof payload {
+    RoomState room_state = 1;
+    MessageReceived message_received = 2;
+    UserJoined user_joined = 3;
+    UserLeft user_left = 4;
+    LLMThinking llm_thinking = 5;
+    LLMChunk llm_chunk = 6;
+    LLMDone llm_done = 7;
+    UserTyping user_typing = 8;
+    Error error = 9;
+    Pong pong = 10;
+  }
+}
+
+message RoomState {
+  RoomInfo room = 1;
+  repeated Participant participants = 2;
+  repeated Message messages = 3;         // last N on join
+}
+
+message MessageReceived {
+  Message message = 1;
+}
+
+message UserJoined {
+  Participant user = 1;
+}
+
+message UserLeft {
+  string user_id = 1;
+}
+
+message LLMThinking {
+  string llm_id = 1;
+  string reply_to = 2;
+}
+
+message LLMChunk {
+  string message_id = 1;
+  string llm_id = 2;
+  string content = 3;      // delta
+  string reply_to = 4;
+}
+
+message LLMDone {
+  string message_id = 1;
+  string llm_id = 2;
+}
+
+message UserTyping {
+  string user_id = 1;
+  string user_name = 2;
+  bool is_typing = 3;
+}
+
+message Error {
+  string code = 1;
+  string message = 2;
+}
+
+message Pong {}

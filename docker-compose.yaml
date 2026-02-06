@@ -12,6 +12,18 @@ services:
       - "50051"
     restart: always
 
+  room-service:
+    build:
+      context: .
+      dockerfile: services/room/Dockerfile
+    environment:
+      - CHAT_SERVICE_ADDRESS=chat-backend:50051
+    expose:
+      - "50052"
+    depends_on:
+      - chat-backend
+    restart: always
+
   gateway:
     build:
       context: .
@@ -19,10 +31,12 @@ services:
     environment:
       - GRPC_HOST=chat-backend
       - GRPC_PORT=50051
+      - ROOM_SERVICE_ADDRESS=room-service:50052
     ports:
       - "8000:8000"
     depends_on:
       - chat-backend
+      - room-service
     restart: always
 
   web:
