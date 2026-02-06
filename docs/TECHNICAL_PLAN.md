@@ -18,19 +18,27 @@
 - [ ] Swap in Redis for pub/sub + ephemeral state
 
 ## Phase 3: Frontend (Feature by Feature)
-- [ ] Room creation UI (select LLMs, set personas)
-- [ ] Room join UI (via URL, set display name/role)
-- [ ] Real-time chat with participants list
-- [ ] @mention autocomplete for LLMs
-- [ ] LLM responses with "replying to" thread links
-- [ ] Typing indicators (humans) + thinking indicators (LLMs)
+- [x] Room creation UI (select LLMs from defaults)
+- [x] Room join UI (display name prompt, localStorage user ID)
+- [x] Real-time chat with participants sidebar
+- [x] @mention autocomplete for LLMs
+- [x] LLM streaming responses with thinking indicators
+- [x] Typing indicators (humans)
+- [ ] Thread links ("replying to" UI for LLM responses)
+- [ ] Room settings / LLM persona editing
+- [ ] Better error handling + reconnection on WebSocket drop
 
 ## Phase 4: Polish
 - [ ] Reconnection handling (resync state on WebSocket drop)
-- [ ] Chat history retrieval (load on room join)
-- [ ] Context management / compression
-- [ ] Interrupt LLM mid-response
-- [ ] Autopilot mode (LLMs take turns)
+- [ ] Load older history (scroll up pagination — LoadHistory RPC exists)
+- [ ] Context management / compression for long conversations
+- [ ] Interrupt LLM mid-response (proto + handler stubbed, needs cancellation)
+- [ ] Autopilot mode (LLMs take turns responding)
+
+## Phase 5: Infrastructure
+- [ ] DynamoDB persistence (store interface is async, ready to swap)
+- [ ] Redis pub/sub for cross-instance broadcasting
+- [ ] Horizontal scaling (multiple Room Service instances behind LB)
 
 ---
 
@@ -38,12 +46,15 @@
 
 **Completed:**
 - [x] Product spec (docs/PRODUCT_SPEC.md)
-- [x] CI/CD pipeline (GitHub Actions → ghcr.io → EC2)
+- [x] CI/CD pipeline (GitHub Actions → ghcr.io → EC2, parallelized 4-way builds)
 - [x] Local dev script (scripts/dev.sh)
-- [x] Existing multi-model chat (working but single-user, no rooms)
+- [x] Existing multi-model chat (working, now legacy)
 - [x] Tech design doc with reviewed proto schema
 - [x] Room service (gRPC, in-memory store, bidi streaming, @mention → LLM)
 - [x] Gateway room endpoints (REST + WebSocket)
-- [x] Docker configs for room service
+- [x] Room UI (create, join, chat, @mention autocomplete, streaming, typing, participants)
+- [x] Docker configs for all services
+- [x] Optimized Dockerfiles for layer caching
+- [x] Parallelized CI/CD (4 concurrent builds)
 
-**Next up:** Phase 3 - Frontend room UI
+**Next up:** Frontend polish (thread links, reconnection) or DynamoDB persistence
