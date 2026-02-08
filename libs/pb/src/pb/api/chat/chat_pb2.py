@@ -25,7 +25,7 @@ _sym_db = _symbol_database.Default()
 from pb.shared import content_pb2 as pb_dot_shared_dot_content__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x16pb/api/chat/chat.proto\x12\x03\x61pi\x1a\x17pb/shared/content.proto\"\x85\x01\n\x0b\x43hatRequest\x12+\n\x08messages\x18\x01 \x03(\x0b\x32\x0f.shared.MessageR\x08messages\x12\x16\n\x06models\x18\x02 \x03(\tR\x06models\x12\"\n\nmax_tokens\x18\x03 \x01(\rH\x00R\tmaxTokens\x88\x01\x01\x42\r\n\x0b_max_tokens\"w\n\x0c\x43hatResponse\x12\x0e\n\x02id\x18\x01 \x01(\tR\x02id\x12\x1c\n\ttimestamp\x18\x02 \x01(\x04R\ttimestamp\x12\x14\n\x05model\x18\x03 \x01(\tR\x05model\x12#\n\x05\x64\x65lta\x18\x04 \x01(\x0b\x32\r.shared.DeltaR\x05\x64\x65lta27\n\x04\x43hat\x12/\n\x04\x43hat\x12\x10.api.ChatRequest\x1a\x11.api.ChatResponse\"\x00\x30\x01\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x16pb/api/chat/chat.proto\x12\x03\x61pi\x1a\x17pb/shared/content.proto\"\xb0\x01\n\x0b\x43hatRequest\x12+\n\x08messages\x18\x01 \x03(\x0b\x32\x0f.shared.MessageR\x08messages\x12\x16\n\x06models\x18\x02 \x03(\tR\x06models\x12\"\n\nmax_tokens\x18\x03 \x01(\rH\x00R\tmaxTokens\x88\x01\x01\x12)\n\x05tools\x18\x04 \x03(\x0b\x32\x13.api.ToolDefinitionR\x05toolsB\r\n\x0b_max_tokens\"o\n\x0eToolDefinition\x12\x12\n\x04name\x18\x01 \x01(\tR\x04name\x12 \n\x0b\x64\x65scription\x18\x02 \x01(\tR\x0b\x64\x65scription\x12\'\n\x0fparameters_json\x18\x03 \x01(\tR\x0eparametersJson\"w\n\x0c\x43hatResponse\x12\x0e\n\x02id\x18\x01 \x01(\tR\x02id\x12\x1c\n\ttimestamp\x18\x02 \x01(\x04R\ttimestamp\x12\x14\n\x05model\x18\x03 \x01(\tR\x05model\x12#\n\x05\x64\x65lta\x18\x04 \x01(\x0b\x32\r.shared.DeltaR\x05\x64\x65lta27\n\x04\x43hat\x12/\n\x04\x43hat\x12\x10.api.ChatRequest\x1a\x11.api.ChatResponse\"\x00\x30\x01\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -33,9 +33,11 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'pb.api.chat.chat_pb2', _glo
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
   _globals['_CHATREQUEST']._serialized_start=57
-  _globals['_CHATREQUEST']._serialized_end=190
-  _globals['_CHATRESPONSE']._serialized_start=192
-  _globals['_CHATRESPONSE']._serialized_end=311
-  _globals['_CHAT']._serialized_start=313
-  _globals['_CHAT']._serialized_end=368
+  _globals['_CHATREQUEST']._serialized_end=233
+  _globals['_TOOLDEFINITION']._serialized_start=235
+  _globals['_TOOLDEFINITION']._serialized_end=346
+  _globals['_CHATRESPONSE']._serialized_start=348
+  _globals['_CHATRESPONSE']._serialized_end=467
+  _globals['_CHAT']._serialized_start=469
+  _globals['_CHAT']._serialized_end=524
 # @@protoc_insertion_point(module_scope)

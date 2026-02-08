@@ -46,7 +46,8 @@ Gateway (FastAPI :8000)
 uv sync
 
 # Start all backend services for local dev
-cd services/chat && uv run python src/chat/main.py          # port 50051
+# IMPORTANT: chat service needs .env sourced for the OpenRouter API key
+cd services/chat && source .env && export OPENROUTER_API_KEY && uv run python src/chat/main.py  # port 50051
 cd services/room && uv run python src/room/main.py          # port 50052
 cd services/gateway && uv run uvicorn gateway.main:app --reload --port 8000
 

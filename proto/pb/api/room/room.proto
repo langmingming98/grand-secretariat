@@ -33,6 +33,12 @@ enum Role {
   VIEWER = 3;
 }
 
+enum PollStatus {
+  POLL_STATUS_UNSPECIFIED = 0;
+  POLL_OPEN = 1;
+  POLL_CLOSED = 2;
+}
+
 // ---------------------------------------------------------------------------
 // Shared messages
 // ---------------------------------------------------------------------------
@@ -42,6 +48,7 @@ message LLMConfig {
   string model = 2;           // OpenRouter model id
   string persona = 3;         // system prompt / role description
   string display_name = 4;    // human-readable, e.g. "Claude"
+  string title = 5;           // job title, e.g. "VP Engineering"
 }
 
 message Participant {
@@ -49,6 +56,7 @@ message Participant {
   string name = 2;
   Role role = 3;
   ParticipantType type = 4;
+  string title = 5;
 }
 
 message RoomInfo {
@@ -57,6 +65,7 @@ message RoomInfo {
   google.protobuf.Timestamp created_at = 3;
   string created_by = 4;
   repeated LLMConfig llms = 5;
+  string description = 6;  // room-wide context (e.g. "Fintech startup meeting room")
 }
 
 message Message {
@@ -67,6 +76,41 @@ message Message {
   string content = 5;
   optional string reply_to = 6;
   google.protobuf.Timestamp timestamp = 7;
+  optional string poll_id = 8;  // If set, this message is a poll (content = question)
+}
+
+// ---------------------------------------------------------------------------
+// Polls
+// ---------------------------------------------------------------------------
+
+message PollVote {
+  string voter_id = 1;
+  string voter_name = 2;
+  string reason = 3;  // optional reasoning (LLMs often explain their vote)
+  google.protobuf.Timestamp voted_at = 4;
+}
+
+message PollOption {
+  string id = 1;
+  string text = 2;
+  string description = 3;  // optional elaboration
+  repeated PollVote votes = 4;
+}
+
+message Poll {
+  string poll_id = 1;
+  string room_id = 2;
+  string creator_id = 3;
+  string creator_name = 4;
+  ParticipantType creator_type = 5;
+  string question = 6;
+  repeated PollOption options = 7;
+  bool allow_multiple = 8;
+  bool anonymous = 9;
+  PollStatus status = 10;
+  google.protobuf.Timestamp created_at = 11;
+  google.protobuf.Timestamp closed_at = 12;
+  bool mandatory = 13;  // If true, LLMs must vote (can't opt out)
 }
 
 // ---------------------------------------------------------------------------
@@ -79,6 +123,7 @@ message CreateRoomRequest {
   // created_by should come from auth context in production;
   // passed explicitly for now while auth is not implemented.
   string created_by = 3;
+  string description = 4;  // room-wide context for all LLMs
 }
 
 message CreateRoomResponse {
@@ -140,7 +185,47 @@ message ClientMessage {
     TypingIndicator typing = 3;
     InterruptLLM interrupt = 4;
     Ping ping = 5;
+    AddLLM add_llm = 6;
+    UpdateLLM update_llm = 7;
+    CreatePoll create_poll = 8;
+    CastVote cast_vote = 9;
+    ClosePoll close_poll = 10;
   }
+}
+
+message CreatePoll {
+  string question = 1;
+  repeated PollOptionInput options = 2;
+  bool allow_multiple = 3;
+  bool anonymous = 4;
+  bool mandatory = 5;  // If true, LLMs must vote
+}
+
+message PollOptionInput {
+  string text = 1;
+  string description = 2;  // optional
+}
+
+message CastVote {
+  string poll_id = 1;
+  repeated string option_ids = 2;  // supports multiple if poll allows
+  string reason = 3;  // optional reasoning
+}
+
+message ClosePoll {
+  string poll_id = 1;
+}
+
+message AddLLM {
+  LLMConfig llm = 1;
+}
+
+message UpdateLLM {
+  string llm_id = 1;
+  optional string model = 2;
+  optional string persona = 3;
+  optional string display_name = 4;
+  optional string title = 5;
 }
 
 message JoinRoom {
@@ -150,6 +235,7 @@ message JoinRoom {
   string user_id = 2;
   string display_name = 3;
   Role role = 4;
+  string title = 5;
 }
 
 message SendMessage {
@@ -187,13 +273,43 @@ message ServerEvent {
     UserTyping user_typing = 8;
     Error error = 9;
     Pong pong = 10;
+    LLMAdded llm_added = 11;
+    LLMUpdated llm_updated = 12;
+    PollCreated poll_created = 13;
+    PollVoted poll_voted = 14;
+    PollClosed poll_closed = 15;
   }
+}
+
+message PollCreated {
+  Poll poll = 1;
+}
+
+message PollVoted {
+  string poll_id = 1;
+  string option_id = 2;
+  PollVote vote = 3;
+}
+
+message PollClosed {
+  string poll_id = 1;
+  string closed_by_id = 2;
+  string closed_by_name = 3;
+}
+
+message LLMAdded {
+  LLMConfig llm = 1;
+}
+
+message LLMUpdated {
+  LLMConfig llm = 1;  // full updated config
 }
 
 message RoomState {
   RoomInfo room = 1;
   repeated Participant participants = 2;
   repeated Message messages = 3;         // last N on join
+  repeated Poll polls = 4;               // active polls in room
 }
 
 message MessageReceived {

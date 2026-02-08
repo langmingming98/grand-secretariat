@@ -35,6 +35,7 @@ class RoomService(room_pb2_grpc.RoomServicer):
             name=request.name,
             created_by=request.created_by,
             llms=list(request.llms),
+            description=request.description,
         )
         logger.info("Created room %s (%s)", room_id, request.name)
         return room_pb2.CreateRoomResponse(room_id=room_id)

@@ -2,37 +2,146 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
-import os
-from typing import Dict, List
+import time
+from typing import Dict, List, Optional
 
 import grpc.aio
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+import httpx
+from fastapi import FastAPI, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
 
 from pb.api.chat import chat_pb2, chat_pb2_grpc
 from pb.api.room import room_pb2, room_pb2_grpc
 from pb.shared import content_pb2
 
+from gateway.config import load_config
+
 logger = logging.getLogger(__name__)
+
+# Load configuration
+_config = load_config()
+
+
+# ---------------------------------------------------------------------------
+# Pydantic models for request/response validation
+# ---------------------------------------------------------------------------
+
+
+class LLMConfigRequest(BaseModel):
+    """LLM configuration for room creation."""
+    id: str
+    model: str
+    persona: str = ""
+    display_name: str
+    title: str = ""
+
+
+class CreateRoomRequest(BaseModel):
+    """Request body for creating a room."""
+    name: str
+    description: str = ""
+    llms: List[LLMConfigRequest] = Field(default_factory=list)
+    created_by: str = "anonymous"
+
+
+class CreateRoomResponse(BaseModel):
+    """Response from room creation."""
+    room_id: str
+
+
+class LLMSummary(BaseModel):
+    """Summary of an LLM in a room listing."""
+    id: str
+    model: str
+    display_name: str
+
+
+class RoomSummary(BaseModel):
+    """Summary of a room for listing."""
+    room_id: str
+    name: str
+    description: str = ""
+    created_at: Optional[str] = None
+    created_by: str
+    llms: List[LLMSummary] = Field(default_factory=list)
+
+
+class ListRoomsResponse(BaseModel):
+    """Response from listing rooms."""
+    rooms: List[RoomSummary]
+    next_cursor: Optional[str] = None
+
+
+class LLMDetail(BaseModel):
+    """Detailed LLM info including persona."""
+    id: str
+    model: str
+    display_name: str
+    persona: str = ""
+
+
+class RoomDetail(BaseModel):
+    """Detailed room info."""
+    room_id: str
+    name: str
+    description: str = ""
+    created_at: Optional[str] = None
+    created_by: str
+    llms: List[LLMDetail] = Field(default_factory=list)
+
+
+class ParticipantInfo(BaseModel):
+    """Participant info for room details."""
+    id: str
+    name: str
+    role: int
+    type: int
+
+
+class GetRoomResponse(BaseModel):
+    """Response from getting room details."""
+    room: RoomDetail
+    participants: List[ParticipantInfo] = Field(default_factory=list)
+
+
+class ModelInfo(BaseModel):
+    """OpenRouter model info."""
+    id: str
+    name: str
+
+
+class ListModelsResponse(BaseModel):
+    """Response from listing models."""
+    models: List[ModelInfo]
+
+
+class HealthResponse(BaseModel):
+    """Health check response."""
+    status: str
+
+
+class RootResponse(BaseModel):
+    """Root endpoint response."""
+    service: str
+    status: str
+    endpoints: Dict[str, str]
 
 app = FastAPI(title="Web Gateway", description="FastAPI gateway for microservices")
 
-# Configure CORS for Next.js dev server
+# Configure CORS (from config)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Next.js default port
-    allow_credentials=True,
+    allow_origins=_config.cors.origins,
+    allow_credentials=_config.cors.allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# gRPC service addresses
-grpc_host = os.environ.get("GRPC_HOST", "localhost")
-grpc_port = os.environ.get("GRPC_PORT", "50051")
-CHAT_SERVICE_ADDRESS = os.getenv("CHAT_SERVICE_ADDRESS", f"{grpc_host}:{grpc_port}")
-ROOM_SERVICE_ADDRESS = os.getenv("ROOM_SERVICE_ADDRESS", "localhost:50052")
+# gRPC service addresses (loaded from config with env override)
+CHAT_SERVICE_ADDRESS = _config.chat_service.address
+ROOM_SERVICE_ADDRESS = _config.room_service.address
 
 def _to_protobuf_messages(messages: List[Dict[str, str]]) -> List[content_pb2.Message]:
     """Convert dict messages to protobuf Message format."""
@@ -124,23 +233,33 @@ async def websocket_chat_stream(websocket: WebSocket):
                 "model": model_name,
             })
         
+    except asyncio.CancelledError:
+        # Task was cancelled (e.g., during shutdown) - don't log as error
+        raise
     except grpc.RpcError as e:
         # gRPC-specific errors
-        await websocket.send_json({
-            "type": "error",
-            "error": f"gRPC error: {e.code()} - {e.details()}",
-        })
-    except WebSocketDisconnect:
-        # Client disconnected, cleanup will happen automatically
-        pass
-    except Exception as e:
         try:
             await websocket.send_json({
                 "type": "error",
-                "error": f"Server error: {str(e)}",
+                "error": f"gRPC error: {e.code()} - {e.details()}",
             })
-        except Exception:
-            # WebSocket already closed, ignore
+        except (WebSocketDisconnect, RuntimeError):
+            pass
+    except WebSocketDisconnect:
+        # Client disconnected, cleanup will happen automatically
+        pass
+    except (ConnectionResetError, BrokenPipeError) as e:
+        # Network-level connection issues
+        logger.debug("Connection closed: %s", e)
+    except Exception as e:
+        logger.exception("Unexpected error in chat WebSocket")
+        try:
+            await websocket.send_json({
+                "type": "error",
+                "error": f"Server error: {type(e).__name__}",
+            })
+        except (WebSocketDisconnect, RuntimeError):
+            # WebSocket already closed
             pass
     finally:
         # Clean up gRPC channel
@@ -153,37 +272,43 @@ async def websocket_chat_stream(websocket: WebSocket):
 # ---------------------------------------------------------------------------
 
 
-@app.post("/api/rooms")
-async def create_room(body: dict):
-    """Create a new room. Body: {name, llms: [{id, model, persona, display_name}], created_by}"""
+@app.post("/api/rooms", response_model=CreateRoomResponse)
+async def create_room(body: CreateRoomRequest) -> CreateRoomResponse:
+    """Create a new room with the specified configuration."""
     channel = grpc.aio.insecure_channel(ROOM_SERVICE_ADDRESS)
     stub = room_pb2_grpc.RoomStub(channel)
 
     llm_configs = [
         room_pb2.LLMConfig(
-            id=llm.get("id", ""),
-            model=llm.get("model", ""),
-            persona=llm.get("persona", ""),
-            display_name=llm.get("display_name", ""),
+            id=llm.id,
+            model=llm.model,
+            persona=llm.persona,
+            display_name=llm.display_name,
+            title=llm.title,
         )
-        for llm in body.get("llms", [])
+        for llm in body.llms
     ]
 
     try:
         resp = await stub.CreateRoom(
             room_pb2.CreateRoomRequest(
-                name=body.get("name", "Untitled"),
+                name=body.name,
                 llms=llm_configs,
-                created_by=body.get("created_by", "anonymous"),
+                created_by=body.created_by,
+                description=body.description,
             )
         )
-        return {"room_id": resp.room_id}
+        return CreateRoomResponse(room_id=resp.room_id)
     finally:
         await channel.close()
 
 
-@app.get("/api/rooms")
-async def list_rooms(user_id: str | None = None, limit: int = 20, cursor: str | None = None):
+@app.get("/api/rooms", response_model=ListRoomsResponse)
+async def list_rooms(
+    user_id: Optional[str] = None,
+    limit: int = 20,
+    cursor: Optional[str] = None,
+) -> ListRoomsResponse:
     """List rooms, optionally filtered by user."""
     channel = grpc.aio.insecure_channel(ROOM_SERVICE_ADDRESS)
     stub = room_pb2_grpc.RoomStub(channel)
@@ -196,55 +321,59 @@ async def list_rooms(user_id: str | None = None, limit: int = 20, cursor: str | 
                 cursor=cursor,
             )
         )
-        rooms = []
-        for r in resp.rooms:
-            rooms.append({
-                "room_id": r.room_id,
-                "name": r.name,
-                "created_at": r.created_at.ToJsonString() if r.created_at.ByteSize() else None,
-                "created_by": r.created_by,
-                "llms": [
-                    {"id": l.id, "model": l.model, "display_name": l.display_name}
+        rooms = [
+            RoomSummary(
+                room_id=r.room_id,
+                name=r.name,
+                created_at=r.created_at.ToJsonString() if r.created_at.ByteSize() else None,
+                created_by=r.created_by,
+                description=r.description,
+                llms=[
+                    LLMSummary(id=l.id, model=l.model, display_name=l.display_name)
                     for l in r.llms
                 ],
-            })
-        result = {"rooms": rooms}
-        if resp.HasField("next_cursor"):
-            result["next_cursor"] = resp.next_cursor
-        return result
+            )
+            for r in resp.rooms
+        ]
+        return ListRoomsResponse(
+            rooms=rooms,
+            next_cursor=resp.next_cursor if resp.HasField("next_cursor") else None,
+        )
     finally:
         await channel.close()
 
 
-@app.get("/api/rooms/{room_id}")
-async def get_room(room_id: str):
+@app.get("/api/rooms/{room_id}", response_model=GetRoomResponse)
+async def get_room(room_id: str) -> GetRoomResponse:
     """Get room details + online participants."""
+    from fastapi import HTTPException
+
     channel = grpc.aio.insecure_channel(ROOM_SERVICE_ADDRESS)
     stub = room_pb2_grpc.RoomStub(channel)
 
     try:
         resp = await stub.GetRoom(room_pb2.GetRoomRequest(room_id=room_id))
         room = resp.room
-        return {
-            "room": {
-                "room_id": room.room_id,
-                "name": room.name,
-                "created_at": room.created_at.ToJsonString() if room.created_at.ByteSize() else None,
-                "created_by": room.created_by,
-                "llms": [
-                    {"id": l.id, "model": l.model, "display_name": l.display_name, "persona": l.persona}
+        return GetRoomResponse(
+            room=RoomDetail(
+                room_id=room.room_id,
+                name=room.name,
+                created_at=room.created_at.ToJsonString() if room.created_at.ByteSize() else None,
+                created_by=room.created_by,
+                description=room.description,
+                llms=[
+                    LLMDetail(id=l.id, model=l.model, display_name=l.display_name, persona=l.persona)
                     for l in room.llms
                 ],
-            },
-            "participants": [
-                {"id": p.id, "name": p.name, "role": p.role, "type": p.type}
+            ),
+            participants=[
+                ParticipantInfo(id=p.id, name=p.name, role=p.role, type=p.type)
                 for p in resp.participants
             ],
-        }
+        )
     except grpc.RpcError as e:
         if e.code() == grpc.StatusCode.NOT_FOUND:
-            from fastapi.responses import JSONResponse
-            return JSONResponse(status_code=404, content={"error": e.details()})
+            raise HTTPException(status_code=404, detail=e.details())
         raise
     finally:
         await channel.close()
@@ -306,6 +435,7 @@ async def websocket_room_session(websocket: WebSocket, room_id: str):
                                     role=role_map.get(
                                         data.get("role", "member"), room_pb2.MEMBER
                                     ),
+                                    title=data.get("title", ""),
                                 )
                             )
                         )
@@ -336,13 +466,86 @@ async def websocket_room_session(websocket: WebSocket, room_id: str):
                         await request_queue.put(
                             room_pb2.ClientMessage(interrupt=interrupt)
                         )
+                    elif msg_type == "add_llm":
+                        llm_data = data.get("llm", {})
+                        await request_queue.put(
+                            room_pb2.ClientMessage(
+                                add_llm=room_pb2.AddLLM(
+                                    llm=room_pb2.LLMConfig(
+                                        id=llm_data.get("id", ""),
+                                        model=llm_data.get("model", ""),
+                                        persona=llm_data.get("persona", ""),
+                                        display_name=llm_data.get("display_name", ""),
+                                        title=llm_data.get("title", ""),
+                                    )
+                                )
+                            )
+                        )
+                    elif msg_type == "update_llm":
+                        update = room_pb2.UpdateLLM(
+                            llm_id=data.get("llm_id", ""),
+                        )
+                        if "model" in data:
+                            update.model = data["model"]
+                        if "persona" in data:
+                            update.persona = data["persona"]
+                        if "display_name" in data:
+                            update.display_name = data["display_name"]
+                        if "title" in data:
+                            update.title = data["title"]
+                        await request_queue.put(
+                            room_pb2.ClientMessage(update_llm=update)
+                        )
+                    elif msg_type == "create_poll":
+                        options = [
+                            room_pb2.PollOptionInput(
+                                text=opt.get("text", ""),
+                                description=opt.get("description", ""),
+                            )
+                            for opt in data.get("options", [])
+                        ]
+                        await request_queue.put(
+                            room_pb2.ClientMessage(
+                                create_poll=room_pb2.CreatePoll(
+                                    question=data.get("question", ""),
+                                    options=options,
+                                    allow_multiple=data.get("allow_multiple", False),
+                                    anonymous=data.get("anonymous", False),
+                                    mandatory=data.get("mandatory", False),
+                                )
+                            )
+                        )
+                    elif msg_type == "cast_vote":
+                        await request_queue.put(
+                            room_pb2.ClientMessage(
+                                cast_vote=room_pb2.CastVote(
+                                    poll_id=data.get("poll_id", ""),
+                                    option_ids=data.get("option_ids", []),
+                                    reason=data.get("reason", ""),
+                                )
+                            )
+                        )
+                    elif msg_type == "close_poll":
+                        await request_queue.put(
+                            room_pb2.ClientMessage(
+                                close_poll=room_pb2.ClosePoll(
+                                    poll_id=data.get("poll_id", ""),
+                                )
+                            )
+                        )
                     elif msg_type == "ping":
                         await request_queue.put(
                             room_pb2.ClientMessage(ping=room_pb2.Ping())
                         )
             except WebSocketDisconnect:
                 await request_queue.put(None)  # Signal end of stream
-            except Exception:
+            except asyncio.CancelledError:
+                await request_queue.put(None)
+                raise
+            except (ConnectionResetError, BrokenPipeError):
+                await request_queue.put(None)
+            except Exception as e:
+                logger.warning("Error reading from WebSocket: %s", e)
                 await request_queue.put(None)
 
         async def _read_grpc():
@@ -352,16 +555,21 @@ async def websocket_room_session(websocket: WebSocket, room_id: str):
                     ws_msg = _server_event_to_json(event)
                     if ws_msg:
                         await websocket.send_json(ws_msg)
+            except asyncio.CancelledError:
+                raise
             except grpc.RpcError as e:
+                logger.warning("gRPC error in room session: %s - %s", e.code(), e.details())
                 try:
                     await websocket.send_json({
                         "type": "error",
                         "error": f"Room service error: {e.details()}",
                     })
-                except Exception:
+                except (WebSocketDisconnect, RuntimeError):
                     pass
-            except Exception:
+            except (ConnectionResetError, BrokenPipeError):
                 pass
+            except Exception as e:
+                logger.warning("Error reading from gRPC stream: %s", e)
 
         # Run both loops concurrently; when either finishes, we're done
         ws_task = asyncio.create_task(_read_ws())
@@ -373,13 +581,18 @@ async def websocket_room_session(websocket: WebSocket, room_id: str):
         for task in pending:
             task.cancel()
 
+    except asyncio.CancelledError:
+        raise
+    except (ConnectionResetError, BrokenPipeError):
+        pass
     except Exception as e:
+        logger.exception("Unexpected error in room WebSocket")
         try:
             await websocket.send_json({
                 "type": "error",
-                "error": f"Gateway error: {str(e)}",
+                "error": f"Gateway error: {type(e).__name__}",
             })
-        except Exception:
+        except (WebSocketDisconnect, RuntimeError):
             pass
     finally:
         await channel.close()
@@ -398,16 +611,18 @@ def _server_event_to_json(event: room_pb2.ServerEvent) -> dict | None:
                 "id": room.room_id,
                 "name": room.name,
                 "created_at": room.created_at.ToJsonString() if room.created_at.ByteSize() else None,
+                "description": room.description,
             },
             "participants": [
-                {"id": p.id, "name": p.name, "role": p.role, "type": p.type}
+                {"id": p.id, "name": p.name, "role": p.role, "type": p.type, "title": p.title}
                 for p in rs.participants
             ],
             "messages": [_message_to_json(m) for m in rs.messages],
             "llms": [
-                {"id": l.id, "model": l.model, "display_name": l.display_name}
+                {"id": l.id, "model": l.model, "display_name": l.display_name, "persona": l.persona, "title": l.title}
                 for l in room.llms
             ],
+            "polls": [_poll_to_json(p) for p in rs.polls],
         }
 
     elif payload == "message_received":
@@ -417,7 +632,7 @@ def _server_event_to_json(event: room_pb2.ServerEvent) -> dict | None:
         u = event.user_joined.user
         return {
             "type": "user_joined",
-            "user": {"id": u.id, "name": u.name, "role": u.role, "type": u.type},
+            "user": {"id": u.id, "name": u.name, "role": u.role, "type": u.type, "title": u.title},
         }
 
     elif payload == "user_left":
@@ -452,6 +667,55 @@ def _server_event_to_json(event: room_pb2.ServerEvent) -> dict | None:
     elif payload == "error":
         return {"type": "error", "error": event.error.message, "code": event.error.code}
 
+    elif payload == "llm_added":
+        l = event.llm_added.llm
+        return {
+            "type": "llm_added",
+            "llm": {
+                "id": l.id, "model": l.model, "display_name": l.display_name,
+                "persona": l.persona, "title": l.title,
+            },
+        }
+
+    elif payload == "llm_updated":
+        l = event.llm_updated.llm
+        return {
+            "type": "llm_updated",
+            "llm": {
+                "id": l.id, "model": l.model, "display_name": l.display_name,
+                "persona": l.persona, "title": l.title,
+            },
+        }
+
+    elif payload == "poll_created":
+        return {
+            "type": "poll_created",
+            "poll": _poll_to_json(event.poll_created.poll),
+        }
+
+    elif payload == "poll_voted":
+        pv = event.poll_voted
+        return {
+            "type": "poll_voted",
+            "poll_id": pv.poll_id,
+            "option_id": pv.option_id,
+            "vote": {
+                "voter_id": pv.vote.voter_id,
+                "voter_name": pv.vote.voter_name,
+                "reason": pv.vote.reason,
+                "voted_at": pv.vote.voted_at.ToMilliseconds() if pv.vote.voted_at.ByteSize() else 0,
+            },
+        }
+
+    elif payload == "poll_closed":
+        pc = event.poll_closed
+        return {
+            "type": "poll_closed",
+            "poll_id": pc.poll_id,
+            "closed_by_id": pc.closed_by_id,
+            "closed_by_name": pc.closed_by_name,
+        }
+
     elif payload == "pong":
         return {"type": "pong"}
 
@@ -472,23 +736,105 @@ def _message_to_json(m: room_pb2.Message) -> dict:
     }
     if m.HasField("reply_to"):
         result["reply_to"] = m.reply_to
+    if m.HasField("poll_id"):
+        result["poll_id"] = m.poll_id
     return result
 
 
-@app.get("/")
-async def root():
+def _poll_to_json(p: room_pb2.Poll) -> dict:
+    """Convert a Poll proto to JSON-serializable dict."""
     return {
-        "service": "web-gateway",
-        "status": "running",
-        "endpoints": {
+        "poll_id": p.poll_id,
+        "room_id": p.room_id,
+        "creator_id": p.creator_id,
+        "creator_name": p.creator_name,
+        "creator_type": "llm" if p.creator_type == room_pb2.LLM else "human",
+        "question": p.question,
+        "options": [
+            {
+                "id": opt.id,
+                "text": opt.text,
+                "description": opt.description,
+                "votes": [
+                    {
+                        "voter_id": v.voter_id,
+                        "voter_name": v.voter_name,
+                        "reason": v.reason,
+                        "voted_at": v.voted_at.ToMilliseconds() if v.voted_at.ByteSize() else 0,
+                    }
+                    for v in opt.votes
+                ],
+            }
+            for opt in p.options
+        ],
+        "allow_multiple": p.allow_multiple,
+        "anonymous": p.anonymous,
+        "mandatory": p.mandatory,
+        "status": "open" if p.status == room_pb2.POLL_OPEN else "closed",
+        "created_at": p.created_at.ToMilliseconds() if p.created_at.ByteSize() else 0,
+        "closed_at": p.closed_at.ToMilliseconds() if p.closed_at.ByteSize() else 0,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Model catalog (proxied from OpenRouter with cache)
+# ---------------------------------------------------------------------------
+
+_models_cache: dict = {"data": None, "ts": 0}
+_MODELS_CACHE_TTL = 600  # 10 minutes
+
+
+@app.get("/api/models", response_model=ListModelsResponse)
+async def list_models(q: str = Query(default="")) -> ListModelsResponse:
+    """Search OpenRouter model catalog. Cached for 10 minutes."""
+    now = time.time()
+    if _models_cache["data"] is None or now - _models_cache["ts"] > _MODELS_CACHE_TTL:
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.get("https://openrouter.ai/api/v1/models")
+                resp.raise_for_status()
+                _models_cache["data"] = resp.json().get("data", [])
+                _models_cache["ts"] = now
+        except httpx.HTTPStatusError as e:
+            logger.error("OpenRouter API error: %s %s", e.response.status_code, e.response.text[:200])
+            if _models_cache["data"] is None:
+                return ListModelsResponse(models=[])
+        except httpx.RequestError as e:
+            logger.error("Failed to fetch OpenRouter models: %s", e)
+            if _models_cache["data"] is None:
+                return ListModelsResponse(models=[])
+
+    models = _models_cache["data"]
+    if q:
+        q_lower = q.lower()
+        models = [m for m in models if q_lower in m.get("id", "").lower() or q_lower in m.get("name", "").lower()]
+
+    # Return a slim response (top 50)
+    return ListModelsResponse(
+        models=[
+            ModelInfo(id=m.get("id", ""), name=m.get("name", ""))
+            for m in models[:50]
+        ]
+    )
+
+
+@app.get("/", response_model=RootResponse)
+async def root() -> RootResponse:
+    """Root endpoint with service info and available endpoints."""
+    return RootResponse(
+        service="web-gateway",
+        status="running",
+        endpoints={
             "health": "/health",
             "chat_ws": "/ws/chat/stream",
             "room_ws": "/ws/room/{room_id}",
             "rooms_api": "/api/rooms",
-        }
-    }
+            "models_api": "/api/models",
+        },
+    )
 
 
-@app.get("/health")
-async def health():
-    return {"status": "ok"}
+@app.get("/health", response_model=HealthResponse)
+async def health() -> HealthResponse:
+    """Health check endpoint."""
+    return HealthResponse(status="ok")

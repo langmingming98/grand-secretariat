@@ -8,14 +8,13 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import re
 from typing import TYPE_CHECKING, Optional
 
 import grpc
 
-from pb.api.chat import chat_pb2, chat_pb2_grpc
 from pb.api.room import room_pb2
-from pb.shared import content_pb2
+
+from room.llm_dispatcher import LLMDispatcher
 
 if TYPE_CHECKING:
     from room.registry import HandlerRegistry
@@ -23,26 +22,38 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_MENTION_RE = re.compile(r"@(\w+)")
-
 
 class StreamHandler:
+    """Handler for a single user's room session stream.
+
+    Each connected user has their own StreamHandler instance which manages:
+    - Reading messages from the client
+    - Writing events to the client
+    - Dispatching @mentions to LLMs via LLMDispatcher
+    """
+
     def __init__(
         self,
         context: grpc.aio.ServicerContext,
-        store: MemoryStore,
-        registry: HandlerRegistry,
+        store: "MemoryStore",
+        registry: "HandlerRegistry",
         chat_service_address: str,
     ) -> None:
         self._context = context
         self._store = store
         self._registry = registry
-        self._chat_address = chat_service_address
         self._outbound: asyncio.Queue[room_pb2.ServerEvent] = asyncio.Queue()
         self._room_id: Optional[str] = None
         self._user_id: Optional[str] = None
         self._display_name: Optional[str] = None
         self._role: room_pb2.Role.ValueType = room_pb2.ROLE_UNSPECIFIED
+
+        # LLM dispatch is handled by a separate class
+        self._llm_dispatcher = LLMDispatcher(
+            chat_service_address=chat_service_address,
+            store=store,
+            registry=registry,
+        )
 
     @property
     def user_id(self) -> Optional[str]:
@@ -79,6 +90,16 @@ class StreamHandler:
                     await self._handle_typing(client_msg.typing)
                 elif payload == "interrupt":
                     await self._handle_interrupt(client_msg.interrupt)
+                elif payload == "add_llm":
+                    await self._handle_add_llm(client_msg.add_llm)
+                elif payload == "update_llm":
+                    await self._handle_update_llm(client_msg.update_llm)
+                elif payload == "create_poll":
+                    await self._handle_create_poll(client_msg.create_poll)
+                elif payload == "cast_vote":
+                    await self._handle_cast_vote(client_msg.cast_vote)
+                elif payload == "close_poll":
+                    await self._handle_close_poll(client_msg.close_poll)
                 elif payload == "ping":
                     await self.enqueue(
                         room_pb2.ServerEvent(pong=room_pb2.Pong())
@@ -87,6 +108,7 @@ class StreamHandler:
             pass
         finally:
             write_task.cancel()
+            await self._llm_dispatcher.cancel_pending_tasks()
             if self._room_id and self._user_id:
                 self._registry.unregister(self._room_id, self)
                 await self._broadcast_user_left()
@@ -119,6 +141,7 @@ class StreamHandler:
             user_id=join.user_id,
             display_name=join.display_name,
             role=join.role,
+            title=join.title,
         )
 
         # Register handler for broadcasts
@@ -136,15 +159,20 @@ class StreamHandler:
                 name=p.display_name,
                 role=p.role,
                 type=room_pb2.HUMAN,
+                title=p.title,
             )
             for p in all_participants
             if p.user_id in online_ids
         ]
 
+        # Load active polls
+        active_polls = await self._store.list_room_polls(join.room_id, active_only=True)
+
         room_state = room_pb2.RoomState(
             room=self._store.room_to_proto(room),
             participants=online_participants,
             messages=[self._store.message_to_proto(m) for m in messages],
+            polls=[self._store.poll_to_proto(p) for p in active_polls],
         )
         await self.enqueue(room_pb2.ServerEvent(room_state=room_state))
 
@@ -158,6 +186,7 @@ class StreamHandler:
                         name=join.display_name,
                         role=join.role,
                         type=room_pb2.HUMAN,
+                        title=join.title,
                     )
                 )
             ),
@@ -196,11 +225,12 @@ class StreamHandler:
         # Check for @mentions
         room = await self._store.get_room(self._room_id)
         if room:
-            await self._dispatch_mentions(
-                send.content,
-                list(send.mentions),
-                stored.message_id,
-                room,
+            await self._llm_dispatcher.dispatch_mentions(
+                room_id=self._room_id,
+                content=send.content,
+                client_mentions=list(send.mentions),
+                trigger_msg_id=stored.message_id,
+                room=room,
             )
 
     async def _handle_typing(self, typing: room_pb2.TypingIndicator) -> None:
@@ -218,158 +248,165 @@ class StreamHandler:
             exclude_user_id=self._user_id,
         )
 
-    async def _handle_interrupt(self, interrupt: room_pb2.InterruptLLM) -> None:
-        # TODO: cancel in-flight LLM tasks
-        logger.info("Interrupt requested for LLM %s", interrupt.llm_id)
-
-    # ------------------------------------------------------------------
-    # @mention → LLM dispatch
-    # ------------------------------------------------------------------
-
-    async def _dispatch_mentions(
-        self,
-        content: str,
-        client_mentions: list[str],
-        trigger_msg_id: str,
-        room,
-    ) -> None:
-        """Parse @mentions and fire off LLM requests for matched LLMs."""
-        # Server re-validates mentions against room config
-        raw_mentions = set(client_mentions) | set(_MENTION_RE.findall(content))
-        llm_lookup = {
-            llm.id.lower(): llm for llm in room.llms
-        } | {
-            llm.display_name.lower(): llm for llm in room.llms
-        }
-
-        matched_llms = []
-        for mention in raw_mentions:
-            llm = llm_lookup.get(mention.lower())
-            if llm and llm not in matched_llms:
-                matched_llms.append(llm)
-
-        for llm_config in matched_llms:
-            asyncio.create_task(
-                self._call_llm(llm_config, trigger_msg_id)
-            )
-
-    async def _call_llm(
-        self,
-        llm_config: room_pb2.LLMConfig,
-        trigger_msg_id: str,
-    ) -> None:
-        """Call the Chat Service for an LLM response and stream chunks back."""
+    async def _handle_add_llm(self, add: room_pb2.AddLLM) -> None:
         if not self._room_id:
             return
-
-        llm_id = llm_config.id
-
-        # Notify: LLM is thinking
-        await self._registry.broadcast(
-            self._room_id,
-            room_pb2.ServerEvent(
-                llm_thinking=room_pb2.LLMThinking(
-                    llm_id=llm_id,
-                    reply_to=trigger_msg_id,
-                )
-            ),
-        )
-
-        # Build context: recent messages for the LLM
-        recent_msgs, _ = await self._store.load_history(self._room_id, limit=50)
-        chat_messages = []
-
-        # System prompt from persona
-        if llm_config.persona:
-            chat_messages.append(
-                content_pb2.Message(
-                    role=content_pb2.USER,  # Will be mapped to system by chat svc
-                    contents=[content_pb2.Content(text=llm_config.persona)],
-                )
-            )
-
-        # Conversation history
-        for msg in recent_msgs:
-            role = (
-                content_pb2.ASSISTANT
-                if msg.sender_type == room_pb2.LLM
-                else content_pb2.USER
-            )
-            prefix = f"{msg.sender_name}: " if role == content_pb2.USER else ""
-            chat_messages.append(
-                content_pb2.Message(
-                    role=role,
-                    contents=[
-                        content_pb2.Content(text=f"{prefix}{msg.content}")
-                    ],
-                )
-            )
-
-        # Generate a message_id for the LLM response
-        import uuid
-
-        response_msg_id = uuid.uuid4().hex[:16]
-        full_content: list[str] = []
-
-        try:
-            channel = grpc.aio.insecure_channel(self._chat_address)
-            stub = chat_pb2_grpc.ChatStub(channel)
-
-            request = chat_pb2.ChatRequest(
-                messages=chat_messages,
-                models=[llm_config.model],
-            )
-
-            async for response in stub.Chat(request):
-                chunk = response.delta.content
-                if chunk:
-                    full_content.append(chunk)
-                    await self._registry.broadcast(
-                        self._room_id,
-                        room_pb2.ServerEvent(
-                            llm_chunk=room_pb2.LLMChunk(
-                                message_id=response_msg_id,
-                                llm_id=llm_id,
-                                content=chunk,
-                                reply_to=trigger_msg_id,
-                            )
-                        ),
-                    )
-
-            await channel.close()
-        except grpc.RpcError as e:
-            logger.error("Chat service error for %s: %s", llm_id, e)
+        ok = await self._store.add_llm(self._room_id, add.llm)
+        if ok:
             await self._registry.broadcast(
                 self._room_id,
                 room_pb2.ServerEvent(
-                    error=room_pb2.Error(
-                        code="LLM_ERROR",
-                        message=f"Error from {llm_config.display_name}: {e.details() if hasattr(e, 'details') else str(e)}",
-                    )
+                    llm_added=room_pb2.LLMAdded(llm=add.llm)
                 ),
+            )
+            logger.info("LLM %s added to room %s", add.llm.id, self._room_id)
+
+    async def _handle_update_llm(self, update: room_pb2.UpdateLLM) -> None:
+        if not self._room_id:
+            return
+        updated = await self._store.update_llm(
+            room_id=self._room_id,
+            llm_id=update.llm_id,
+            model=update.model if update.HasField("model") else None,
+            persona=update.persona if update.HasField("persona") else None,
+            display_name=update.display_name if update.HasField("display_name") else None,
+            title=update.title if update.HasField("title") else None,
+        )
+        if updated:
+            await self._registry.broadcast(
+                self._room_id,
+                room_pb2.ServerEvent(
+                    llm_updated=room_pb2.LLMUpdated(llm=updated)
+                ),
+            )
+            logger.info("LLM %s updated in room %s", update.llm_id, self._room_id)
+
+    async def _handle_interrupt(self, interrupt: room_pb2.InterruptLLM) -> None:
+        # TODO: cancel specific in-flight LLM tasks by ID
+        logger.info("Interrupt requested for LLM %s", interrupt.llm_id)
+
+    async def _handle_create_poll(self, create: room_pb2.CreatePoll) -> None:
+        if not self._room_id or not self._user_id:
+            return
+
+        options = [(opt.text, opt.description) for opt in create.options]
+        if len(options) < 2:
+            await self.enqueue(
+                room_pb2.ServerEvent(
+                    error=room_pb2.Error(
+                        code="INVALID_POLL",
+                        message="Poll must have at least 2 options",
+                    )
+                )
             )
             return
 
-        # Store the complete LLM message
-        await self._store.add_message(
+        # Create the poll
+        poll = await self._store.create_poll(
             room_id=self._room_id,
-            sender_id=llm_id,
-            sender_name=llm_config.display_name,
-            sender_type=room_pb2.LLM,
-            content="".join(full_content),
-            reply_to=trigger_msg_id,
+            creator_id=self._user_id,
+            creator_name=self._display_name or "Unknown",
+            creator_type=room_pb2.HUMAN,
+            question=create.question,
+            options=options,
+            allow_multiple=create.allow_multiple,
+            anonymous=create.anonymous,
+            mandatory=create.mandatory,
         )
 
-        # Notify: LLM is done
+        # Create a message for the poll (so it appears in chat history)
+        poll_msg = await self._store.add_message(
+            room_id=self._room_id,
+            sender_id=self._user_id,
+            sender_name=self._display_name or "Unknown",
+            sender_type=room_pb2.HUMAN,
+            content=create.question,
+            poll_id=poll.poll_id,
+        )
+
+        # Broadcast the poll message (includes poll_id for frontend rendering)
+        msg_proto = self._store.message_to_proto(poll_msg)
         await self._registry.broadcast(
             self._room_id,
             room_pb2.ServerEvent(
-                llm_done=room_pb2.LLMDone(
-                    message_id=response_msg_id,
-                    llm_id=llm_id,
+                message_received=room_pb2.MessageReceived(message=msg_proto)
+            ),
+        )
+
+        # Also broadcast poll_created so frontend can update poll state
+        await self._registry.broadcast(
+            self._room_id,
+            room_pb2.ServerEvent(
+                poll_created=room_pb2.PollCreated(
+                    poll=self._store.poll_to_proto(poll)
                 )
             ),
         )
+        logger.info("Poll %s created in room %s by %s", poll.poll_id, self._room_id, self._user_id)
+
+        # Trigger all LLMs to vote on the poll
+        poll_options = [
+            {"id": opt.id, "text": opt.text, "description": opt.description}
+            for opt in poll.options
+        ]
+        await self._llm_dispatcher.dispatch_poll_voting(
+            room_id=self._room_id,
+            poll_id=poll.poll_id,
+            question=create.question,
+            options=poll_options,
+            mandatory=create.mandatory,
+            trigger_msg_id=poll_msg.message_id,
+        )
+
+    async def _handle_cast_vote(self, vote: room_pb2.CastVote) -> None:
+        if not self._room_id or not self._user_id:
+            return
+
+        # Vote on each selected option
+        for option_id in vote.option_ids:
+            result = await self._store.add_vote(
+                poll_id=vote.poll_id,
+                option_id=option_id,
+                voter_id=self._user_id,
+                voter_name=self._display_name or "Unknown",
+                reason=vote.reason,
+            )
+            if result:
+                poll, option, stored_vote = result
+                await self._registry.broadcast(
+                    self._room_id,
+                    room_pb2.ServerEvent(
+                        poll_voted=room_pb2.PollVoted(
+                            poll_id=poll.poll_id,
+                            option_id=option.id,
+                            vote=self._store.poll_vote_to_proto(stored_vote),
+                        )
+                    ),
+                )
+                logger.info(
+                    "Vote cast on poll %s option %s by %s",
+                    vote.poll_id,
+                    option_id,
+                    self._user_id,
+                )
+
+    async def _handle_close_poll(self, close: room_pb2.ClosePoll) -> None:
+        if not self._room_id or not self._user_id:
+            return
+
+        poll = await self._store.close_poll(close.poll_id)
+        if poll:
+            await self._registry.broadcast(
+                self._room_id,
+                room_pb2.ServerEvent(
+                    poll_closed=room_pb2.PollClosed(
+                        poll_id=poll.poll_id,
+                        closed_by_id=self._user_id,
+                        closed_by_name=self._display_name or "Unknown",
+                    )
+                ),
+            )
+            logger.info("Poll %s closed by %s", close.poll_id, self._user_id)
 
     async def _broadcast_user_left(self) -> None:
         if not self._room_id or not self._user_id:

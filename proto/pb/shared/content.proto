@@ -36,4 +36,6 @@ message Delta {
   MessageRole role = 1;
   string content = 2;
   repeated ToolCall tool_calls = 3;
+  // For tool call responses, signals if the model chose to not respond
+  bool opted_out = 4;
 }

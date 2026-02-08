@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { getWsUrl } from '../lib/api'
+import { stripSenderPrefix } from '../lib/utils'
 
 // ---- Types ----
 
@@ -9,6 +11,7 @@ export interface Participant {
   name: string
   role: number
   type: number // 1=human, 2=llm
+  title?: string
 }
 
 export interface ChatMessage {
@@ -17,18 +20,52 @@ export interface ChatMessage {
   content: string
   reply_to?: string
   timestamp: number
+  poll_id?: string  // If set, this message is a poll
 }
 
 export interface LLMInfo {
   id: string
   model: string
   display_name: string
+  persona?: string
+  title?: string
 }
 
 export interface RoomInfo {
   id: string
   name: string
+  description?: string
   created_at: string | null
+}
+
+export interface PollVote {
+  voter_id: string
+  voter_name: string
+  reason: string
+  voted_at: number
+}
+
+export interface PollOption {
+  id: string
+  text: string
+  description: string
+  votes: PollVote[]
+}
+
+export interface Poll {
+  poll_id: string
+  room_id: string
+  creator_id: string
+  creator_name: string
+  creator_type: 'human' | 'llm'
+  question: string
+  options: PollOption[]
+  allow_multiple: boolean
+  anonymous: boolean
+  mandatory: boolean
+  status: 'open' | 'closed'
+  created_at: number
+  closed_at: number
 }
 
 interface StreamingLLM {
@@ -49,10 +86,12 @@ interface RoomState {
   participants: Participant[]
   messages: ChatMessage[]
   llms: LLMInfo[]
+  polls: Poll[]
   streamingLLMs: Record<string, StreamingLLM>
   typingUsers: TypingUser[]
   error: string | null
   isConnected: boolean
+  wasConnected: boolean // True after first successful connection
 }
 
 // ---- Hook ----
@@ -64,38 +103,25 @@ export function useRoomSocket(roomId: string) {
     participants: [],
     messages: [],
     llms: [],
+    polls: [],
     streamingLLMs: {},
     typingUsers: [],
     error: null,
     isConnected: false,
+    wasConnected: false,
   })
 
   const connect = useCallback(
-    (userId: string, displayName: string, role: string = 'member') => {
+    (userId: string, displayName: string, role: string = 'member', title: string = '') => {
       if (wsRef.current) {
         wsRef.current.close()
       }
 
-      let wsUrl: string
-      if (typeof window !== 'undefined') {
-        const isLocalDev =
-          window.location.hostname === 'localhost' &&
-          window.location.port === '3000'
-        if (isLocalDev) {
-          wsUrl = `ws://localhost:8000/ws/room/${roomId}`
-        } else {
-          const protocol =
-            window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-          wsUrl = `${protocol}//${window.location.host}/ws/room/${roomId}`
-        }
-      } else {
-        wsUrl = `ws://localhost:8000/ws/room/${roomId}`
-      }
-
+      const wsUrl = getWsUrl(`/ws/room/${roomId}`)
       const ws = new WebSocket(wsUrl)
 
       ws.onopen = () => {
-        setState((prev) => ({ ...prev, isConnected: true, error: null }))
+        setState((prev) => ({ ...prev, isConnected: true, wasConnected: true, error: null }))
         // Send join message
         ws.send(
           JSON.stringify({
@@ -103,6 +129,7 @@ export function useRoomSocket(roomId: string) {
             user_id: userId,
             name: displayName,
             role,
+            title,
           })
         )
       }
@@ -140,15 +167,25 @@ export function useRoomSocket(roomId: string) {
           ...prev,
           room: data.room,
           participants: data.participants || [],
-          messages: data.messages || [],
+          messages: (data.messages || []).map((msg: ChatMessage) => ({
+            ...msg,
+            content: stripSenderPrefix(msg.content, msg.sender.name),
+          })),
           llms: data.llms || [],
+          polls: data.polls || [],
         }))
         break
 
       case 'message':
         setState((prev) => ({
           ...prev,
-          messages: [...prev.messages, data as ChatMessage],
+          messages: [
+            ...prev.messages,
+            {
+              ...(data as ChatMessage),
+              content: stripSenderPrefix(data.content, data.sender?.name || ''),
+            },
+          ],
         }))
         break
 
@@ -161,7 +198,9 @@ export function useRoomSocket(roomId: string) {
           return {
             ...prev,
             participants: exists
-              ? prev.participants
+              ? prev.participants.map((p) =>
+                  p.id === data.user.id ? { ...p, ...data.user } : p
+                )
               : [...prev.participants, data.user],
           }
         })
@@ -203,7 +242,8 @@ export function useRoomSocket(roomId: string) {
                 message_id: data.message_id,
                 llm_id: data.llm_id,
                 content: (existing?.content || '') + data.content,
-                reply_to: data.reply_to,
+                // Preserve reply_to from thinking event if chunk doesn't have it
+                reply_to: data.reply_to || existing?.reply_to || '',
                 is_thinking: false,
               },
             },
@@ -225,7 +265,10 @@ export function useRoomSocket(roomId: string) {
               name: llmInfo?.display_name || data.llm_id,
               type: 'llm',
             },
-            content: streaming.content,
+            content: stripSenderPrefix(
+              streaming.content,
+              llmInfo?.display_name || data.llm_id
+            ),
             reply_to: streaming.reply_to,
             timestamp: Date.now(),
           }
@@ -268,6 +311,62 @@ export function useRoomSocket(roomId: string) {
         })
         break
 
+      case 'llm_added':
+        setState((prev) => {
+          const exists = prev.llms.some((l) => l.id === data.llm.id)
+          return {
+            ...prev,
+            llms: exists ? prev.llms : [...prev.llms, data.llm],
+          }
+        })
+        break
+
+      case 'llm_updated':
+        setState((prev) => ({
+          ...prev,
+          llms: prev.llms.map((l) =>
+            l.id === data.llm.id ? { ...l, ...data.llm } : l
+          ),
+        }))
+        break
+
+      case 'poll_created':
+        setState((prev) => ({
+          ...prev,
+          polls: [...prev.polls, data.poll],
+        }))
+        break
+
+      case 'poll_voted':
+        setState((prev) => ({
+          ...prev,
+          polls: prev.polls.map((poll) => {
+            if (poll.poll_id !== data.poll_id) return poll
+            return {
+              ...poll,
+              options: poll.options.map((opt) => {
+                if (opt.id !== data.option_id) return opt
+                return {
+                  ...opt,
+                  votes: [...opt.votes, data.vote],
+                }
+              }),
+            }
+          }),
+        }))
+        break
+
+      case 'poll_closed':
+        setState((prev) => ({
+          ...prev,
+          polls: prev.polls.map((poll) =>
+            poll.poll_id === data.poll_id
+              ? { ...poll, status: 'closed' as const }
+              : poll
+          ),
+        }))
+        break
+
       case 'error':
         setState((prev) => ({ ...prev, error: data.error }))
         break
@@ -303,6 +402,43 @@ export function useRoomSocket(roomId: string) {
     []
   )
 
+  const addLLM = useCallback(
+    (llm: { id: string; model: string; persona: string; display_name: string; title?: string }) => {
+      if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return
+      wsRef.current.send(JSON.stringify({ type: 'add_llm', llm }))
+    },
+    []
+  )
+
+  const updateLLM = useCallback(
+    (update: { llm_id: string; model?: string; persona?: string; display_name?: string; title?: string }) => {
+      if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return
+      wsRef.current.send(JSON.stringify({ type: 'update_llm', ...update }))
+    },
+    []
+  )
+
+  const createPoll = useCallback(
+    (poll: { question: string; options: { text: string; description?: string }[]; allow_multiple?: boolean; anonymous?: boolean; mandatory?: boolean }) => {
+      if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return
+      wsRef.current.send(JSON.stringify({ type: 'create_poll', ...poll }))
+    },
+    []
+  )
+
+  const castVote = useCallback(
+    (poll_id: string, option_ids: string[], reason?: string) => {
+      if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return
+      wsRef.current.send(JSON.stringify({ type: 'cast_vote', poll_id, option_ids, reason: reason || '' }))
+    },
+    []
+  )
+
+  const closePoll = useCallback((poll_id: string) => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return
+    wsRef.current.send(JSON.stringify({ type: 'close_poll', poll_id }))
+  }, [])
+
   const disconnect = useCallback(() => {
     if (wsRef.current) {
       wsRef.current.close()
@@ -326,5 +462,10 @@ export function useRoomSocket(roomId: string) {
     sendMessage,
     sendTyping,
     interruptLLM,
+    addLLM,
+    updateLLM,
+    createPoll,
+    castVote,
+    closePoll,
   }
 }

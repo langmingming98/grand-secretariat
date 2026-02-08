@@ -57,6 +57,30 @@ def _to_openrouter_messages(
     return result
 
 
+def _to_openrouter_tools(
+    tools: List[chat_pb2.ToolDefinition],
+) -> list[dict]:
+    """
+    Convert protobuf ToolDefinition to OpenAI-compatible tool format.
+    """
+    import json
+    result: list[dict] = []
+    for tool in tools:
+        try:
+            params = json.loads(tool.parameters_json) if tool.parameters_json else {}
+        except json.JSONDecodeError:
+            params = {}
+        result.append({
+            "type": "function",
+            "function": {
+                "name": tool.name,
+                "description": tool.description,
+                "parameters": params,
+            }
+        })
+    return result
+
+
 class ChatService(chat_pb2_grpc.ChatServicer):
     """
     gRPC Chat service implementation backed by the OpenRouter provider.
@@ -75,6 +99,7 @@ class ChatService(chat_pb2_grpc.ChatServicer):
 
         messages = _to_openrouter_messages(list(request.messages))
         models: List[str] = list(request.models)
+        tools = _to_openrouter_tools(list(request.tools)) if request.tools else None
 
         max_tokens: int | None
         if request.HasField("max_tokens"):
@@ -86,6 +111,7 @@ class ChatService(chat_pb2_grpc.ChatServicer):
             messages=messages,
             models=models,
             max_tokens=max_tokens,
+            tools=tools,
         ):
             yield _to_chat_response(request_id=request_id, delta=delta)
 
@@ -100,6 +126,19 @@ def _to_chat_response(
     """
     ts_ms = int(time.time() * 1000)
     role_enum = _role_str_to_enum(delta.role)
+
+    # Convert tool calls if present
+    proto_tool_calls = []
+    if delta.tool_calls:
+        for tc in delta.tool_calls:
+            proto_tool_calls.append(
+                content_pb2.ToolCall(
+                    id=tc.id,
+                    name=tc.name,
+                    arguments=tc.arguments,
+                )
+            )
+
     return chat_pb2.ChatResponse(
         id=request_id,
         timestamp=ts_ms,
@@ -107,7 +146,8 @@ def _to_chat_response(
         delta=content_pb2.Delta(
             role=role_enum,
             content=delta.content,
-            # tool_calls left empty for now; can be populated once supported
+            tool_calls=proto_tool_calls,
+            opted_out=delta.opted_out,
         ),
     )
 

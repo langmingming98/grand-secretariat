@@ -124,6 +124,7 @@ source = { editable = "services/gateway" }
 dependencies = [
     { name = "fastapi" },
     { name = "grpcio" },
+    { name = "httpx" },
     { name = "pb" },
     { name = "uvicorn", extra = ["standard"] },
     { name = "websockets" },
@@ -133,6 +134,7 @@ dependencies = [
 requires-dist = [
     { name = "fastapi", specifier = ">=0.104.0" },
     { name = "grpcio", specifier = ">=1.68.0" },
+    { name = "httpx", specifier = ">=0.27.0" },
     { name = "pb", editable = "libs/pb" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.24.0" },
     { name = "websockets", specifier = ">=12.0" },
