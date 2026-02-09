@@ -44,6 +44,12 @@ Gateway (FastAPI :8000)
 - `WS /ws/room/{id}` - Room session (bidi: join, message, typing, interrupt, ping)
 - `WS /ws/chat/stream` - Legacy single-shot multi-model chat
 
+## Prerequisites
+
+- **Python 3.12+** and [uv](https://docs.astral.sh/uv/) for backend services
+- **Node.js 18+** and npm for frontend
+- **[Buf CLI](https://buf.build/docs/cli/installation/)** for protobuf generation (`brew install bufbuild/buf/buf`)
+
 ## Common Commands
 
 ```bash

@@ -9,7 +9,7 @@ import grpc.aio
 from fastapi import APIRouter, HTTPException
 
 from pb.api.room import room_pb2, room_pb2_grpc
-from pb.api import chat_pb2, chat_pb2_grpc
+from pb.api.chat import chat_pb2, chat_pb2_grpc
 from pb.shared import content_pb2
 
 from gateway.config import load_config
