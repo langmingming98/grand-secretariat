@@ -2,7 +2,6 @@
 
 import json
 import logging
-import re
 from typing import Optional
 
 import grpc.aio
@@ -41,13 +40,13 @@ ROOM_SERVICE_ADDRESS = _config.room_service.address
 CHAT_SERVICE_ADDRESS = _config.chat_service.address
 
 # Fast models for room config generation
-GENERATOR_MODEL = "anthropic/claude-3-5-haiku-20241022"
+GENERATOR_MODEL = "z-ai/glm-4.7-flash"
 
 # Available models for AI to assign (fast, capable models)
 AVAILABLE_MODELS = [
-    {"id": "anthropic/claude-3-5-haiku-20241022", "name": "Claude 3.5 Haiku", "strengths": "fast, balanced, good at following instructions"},
+    {"id": "anthropic/claude-3.5-haiku", "name": "Claude 3.5 Haiku", "strengths": "fast, balanced, good at following instructions"},
     {"id": "openai/gpt-4o-mini", "name": "GPT-4o Mini", "strengths": "fast, creative, broad knowledge"},
-    {"id": "google/gemini-2.0-flash-001", "name": "Gemini 2.0 Flash", "strengths": "very fast, analytical, good at structured tasks"},
+    {"id": "google/gemini-2.5-flash-lite-preview-09-2025", "name": "Gemini 2.5 Flash Lite", "strengths": "very fast, analytical, good at structured tasks"},
 ]
 
 ROOM_CONFIG_SYSTEM_PROMPT = """You are a room configuration assistant. Given a user's description of the room they want to create, generate a structured JSON configuration.
@@ -55,29 +54,46 @@ ROOM_CONFIG_SYSTEM_PROMPT = """You are a room configuration assistant. Given a u
 Available models to assign (pick appropriate ones based on roles):
 {models}
 
-Output ONLY valid JSON in this exact format (no markdown, no explanation):
-{{
-  "name": "Short room name (2-5 words)",
-  "description": "1-2 sentence description of the room's purpose and context",
-  "topic": "Main topic or theme",
-  "goal": "What participants should achieve",
-  "llms": [
-    {{
-      "id": "short-id-no-spaces",
-      "model": "model/id-from-available-list",
-      "display_name": "Character Name",
-      "persona": "Detailed persona description including personality, expertise, speaking style, and role in the discussion",
-      "title": "Job Title or Role"
-    }}
-  ]
-}}
-
 Guidelines:
 - Create 2-4 LLMs based on the prompt (unless user specifies otherwise)
 - Each LLM should have a distinct perspective/role that creates interesting dynamics
 - Personas should be detailed (2-3 sentences) with specific personality traits
 - Use different models for variety when appropriate
-- Make the room engaging and productive for the stated goal"""
+- Make the room engaging and productive for the stated goal
+- Room name should be short (2-5 words)
+- Description should be 1-2 sentences about the room's purpose"""
+
+# JSON schema for structured output from the LLM
+ROOM_CONFIG_JSON_SCHEMA = {
+    "name": "room_config",
+    "strict": True,
+    "schema": {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string", "description": "Short room name (2-5 words)"},
+            "description": {"type": "string", "description": "1-2 sentence description of the room's purpose"},
+            "topic": {"type": "string", "description": "Main topic or theme"},
+            "goal": {"type": "string", "description": "What participants should achieve"},
+            "llms": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "string", "description": "Short identifier, no spaces"},
+                        "model": {"type": "string", "description": "Model ID from available list"},
+                        "display_name": {"type": "string", "description": "Character name"},
+                        "persona": {"type": "string", "description": "Detailed persona with personality, expertise, speaking style"},
+                        "title": {"type": "string", "description": "Job title or role"},
+                    },
+                    "required": ["id", "model", "display_name", "persona", "title"],
+                    "additionalProperties": False,
+                },
+            },
+        },
+        "required": ["name", "description", "topic", "goal", "llms"],
+        "additionalProperties": False,
+    },
+}
 
 
 @router.post("", response_model=CreateRoomResponse)
@@ -253,7 +269,7 @@ async def generate_room_config(body: GenerateConfigRequest) -> GenerateConfigRes
     )
     system_prompt = ROOM_CONFIG_SYSTEM_PROMPT.format(models=models_desc)
 
-    # Build chat request
+    # Build chat request with structured output
     messages = [
         content_pb2.Message(
             role=content_pb2.SYSTEM,
@@ -265,6 +281,11 @@ async def generate_room_config(body: GenerateConfigRequest) -> GenerateConfigRes
         ),
     ]
 
+    response_format = chat_pb2.ResponseFormat(
+        type="json_schema",
+        json_schema=json.dumps(ROOM_CONFIG_JSON_SCHEMA),
+    )
+
     channel = grpc.aio.insecure_channel(CHAT_SERVICE_ADDRESS)
     try:
         stub = chat_pb2_grpc.ChatStub(channel)
@@ -272,6 +293,7 @@ async def generate_room_config(body: GenerateConfigRequest) -> GenerateConfigRes
             messages=messages,
             models=[GENERATOR_MODEL],
             max_tokens=2000,
+            response_format=response_format,
         )
 
         # Collect streaming response
@@ -280,16 +302,9 @@ async def generate_room_config(body: GenerateConfigRequest) -> GenerateConfigRes
             if response.delta and response.delta.content:
                 full_response += response.delta.content
 
-        # Parse JSON from response
-        # Try to extract JSON if wrapped in markdown code blocks
-        json_match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", full_response)
-        if json_match:
-            json_str = json_match.group(1)
-        else:
-            json_str = full_response.strip()
-
+        # Structured output guarantees valid JSON
         try:
-            config = json.loads(json_str)
+            config = json.loads(full_response)
         except json.JSONDecodeError as e:
             logger.error("Failed to parse AI response as JSON: %s\nResponse: %s", e, full_response)
             raise HTTPException(

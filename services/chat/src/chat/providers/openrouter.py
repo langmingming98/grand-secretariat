@@ -61,6 +61,7 @@ class OpenRouterChatProvider:
         models: List[str],
         max_tokens: Optional[int] = None,
         tools: Optional[List[Mapping[str, object]]] = None,
+        response_format: Optional[Mapping[str, object]] = None,
     ) -> AsyncIterator[ProviderDelta]:
         """
         Stream chat completions from OpenRouter for one or more models.
@@ -97,6 +98,7 @@ class OpenRouterChatProvider:
                             messages=list(messages),
                             max_tokens=effective_max_tokens,
                             tools=tools,
+                            response_format=response_format,
                             queue=queue,
                         )
                     )
@@ -125,6 +127,7 @@ class OpenRouterChatProvider:
         messages: List[Mapping[str, object]],
         max_tokens: int,
         tools: Optional[List[Mapping[str, object]]],
+        response_format: Optional[Mapping[str, object]] = None,
         queue: "asyncio.Queue[Optional[ProviderDelta]]",
     ) -> None:
         """
@@ -147,6 +150,8 @@ class OpenRouterChatProvider:
             kwargs["reasoning"] = {"effort": reasoning_effort}
         if tools:
             kwargs["tools"] = tools
+        if response_format:
+            kwargs["response_format"] = response_format
 
         try:
             response = await client.chat.send_async(**kwargs)

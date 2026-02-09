@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import time
 import uuid
 from typing import AsyncIterator, List
@@ -107,11 +108,19 @@ class ChatService(chat_pb2_grpc.ChatServicer):
         else:
             max_tokens = None
 
+        response_format: dict | None = None
+        if request.HasField("response_format"):
+            rf = request.response_format
+            response_format = {"type": rf.type}
+            if rf.HasField("json_schema"):
+                response_format["json_schema"] = json.loads(rf.json_schema)
+
         async for delta in self._provider.stream_chat(
             messages=messages,
             models=models,
             max_tokens=max_tokens,
             tools=tools,
+            response_format=response_format,
         ):
             yield _to_chat_response(request_id=request_id, delta=delta)
 

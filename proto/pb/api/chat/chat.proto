@@ -10,11 +10,17 @@ service Chat {
 
 }
 
+message ResponseFormat {
+  string type = 1;              // "json_schema" or "json_object"
+  optional string json_schema = 2;  // JSON string of the schema (required when type = "json_schema")
+}
+
 message ChatRequest {
   repeated shared.Message messages = 1;
   repeated string models = 2;
   optional uint32 max_tokens = 3;
   repeated ToolDefinition tools = 4;
+  optional ResponseFormat response_format = 5;
 }
 
 message ToolDefinition {
