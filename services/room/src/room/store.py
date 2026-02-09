@@ -24,6 +24,7 @@ class StoredRoom:
     created_by: str
     llms: list[room_pb2.LLMConfig]
     description: str = ""
+    visibility: room_pb2.RoomVisibility.ValueType = room_pb2.ROOM_VISIBILITY_PUBLIC
 
 
 @dataclass
@@ -49,6 +50,7 @@ class StoredParticipant:
     role: room_pb2.Role.ValueType
     joined_at: datetime
     title: str = ""
+    avatar: str = ""  # emoji avatar
 
 
 @dataclass
@@ -119,6 +121,7 @@ class MemoryStore:
         created_by: str,
         llms: list[room_pb2.LLMConfig],
         description: str = "",
+        visibility: room_pb2.RoomVisibility.ValueType = room_pb2.ROOM_VISIBILITY_PUBLIC,
     ) -> str:
         room_id = uuid.uuid4().hex[:12]
         self._rooms[room_id] = StoredRoom(
@@ -128,6 +131,7 @@ class MemoryStore:
             created_by=created_by,
             llms=list(llms),
             description=description,
+            visibility=visibility,
         )
         self._messages[room_id] = []
         return room_id
@@ -146,6 +150,15 @@ class MemoryStore:
             rooms = [self._rooms[rid] for rid in room_ids if rid in self._rooms]
         else:
             rooms = list(self._rooms.values())
+
+        # Filter out private rooms that don't belong to the requesting user
+        # Private rooms are only visible to their creator (in room list)
+        rooms = [
+            r
+            for r in rooms
+            if r.visibility != room_pb2.ROOM_VISIBILITY_PRIVATE
+            or r.created_by == user_id
+        ]
 
         rooms.sort(key=lambda r: r.created_at, reverse=True)
 
@@ -168,6 +181,7 @@ class MemoryStore:
         display_name: str,
         role: room_pb2.Role.ValueType,
         title: str = "",
+        avatar: str = "",
     ) -> StoredParticipant:
         key = (room_id, user_id)
         if key in self._participants:
@@ -175,6 +189,7 @@ class MemoryStore:
             self._participants[key].display_name = display_name
             self._participants[key].role = role
             self._participants[key].title = title
+            self._participants[key].avatar = avatar
         else:
             self._participants[key] = StoredParticipant(
                 user_id=user_id,
@@ -183,6 +198,7 @@ class MemoryStore:
                 role=role,
                 joined_at=_now(),
                 title=title,
+                avatar=avatar,
             )
             self._user_rooms.setdefault(user_id, set()).add(room_id)
         return self._participants[key]
@@ -206,6 +222,8 @@ class MemoryStore:
         persona: Optional[str] = None,
         display_name: Optional[str] = None,
         title: Optional[str] = None,
+        chat_style: Optional[int] = None,
+        avatar: Optional[str] = None,
     ) -> Optional[room_pb2.LLMConfig]:
         """Update an LLM config in a room. Returns updated config or None."""
         room = self._rooms.get(room_id)
@@ -221,8 +239,21 @@ class MemoryStore:
                     llm.display_name = display_name
                 if title is not None:
                     llm.title = title
+                if chat_style is not None:
+                    llm.chat_style = chat_style
+                if avatar is not None:
+                    llm.avatar = avatar
                 return llm
         return None
+
+    async def remove_llm(self, room_id: str, llm_id: str) -> bool:
+        """Remove an LLM from a room. Returns True if removed."""
+        room = self._rooms.get(room_id)
+        if not room:
+            return False
+        original_len = len(room.llms)
+        room.llms = [l for l in room.llms if l.id != llm_id]
+        return len(room.llms) < original_len
 
     async def get_participants(self, room_id: str) -> list[StoredParticipant]:
         return [
@@ -299,6 +330,7 @@ class MemoryStore:
             created_by=room.created_by,
             llms=room.llms,
             description=room.description,
+            visibility=room.visibility,
         )
 
     # ------------------------------------------------------------------

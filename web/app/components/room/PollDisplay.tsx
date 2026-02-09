@@ -107,10 +107,10 @@ function PollDisplayInner({ poll, userId, onVote, onClose }: PollDisplayProps) {
                     : 'border-slate-200 hover:border-slate-300'
                 } ${(!isOpen || hasVoted) && !wasVoted ? 'opacity-75' : ''}`}
               >
-                {/* Background bar showing percentage */}
-                {(hasVoted || !isOpen) && (
+                {/* Background bar showing percentage - always visible for real-time results */}
+                {totalVotes > 0 && (
                   <div
-                    className="absolute inset-0 bg-slate-100"
+                    className={`absolute inset-0 ${wasVoted ? 'bg-green-100' : 'bg-slate-100'}`}
                     style={{ width: `${percentage}%` }}
                   />
                 )}
@@ -142,7 +142,8 @@ function PollDisplayInner({ poll, userId, onVote, onClose }: PollDisplayProps) {
                     )}
                     <span className="text-sm text-slate-800">{opt.text}</span>
                   </div>
-                  {(hasVoted || !isOpen) && (
+                  {/* Always show vote counts in real-time */}
+                  {totalVotes > 0 && (
                     <span className="text-xs text-slate-500">
                       {voteCount} ({percentage.toFixed(0)}%)
                     </span>
@@ -156,8 +157,8 @@ function PollDisplayInner({ poll, userId, onVote, onClose }: PollDisplayProps) {
                 )}
               </button>
 
-              {/* Show voters */}
-              {(hasVoted || !isOpen) && opt.votes.length > 0 && !poll.anonymous && (
+              {/* Show voters - always visible for real-time feedback */}
+              {opt.votes.length > 0 && !poll.anonymous && (
                 <div className="mt-1 ml-6 text-xs text-slate-400">
                   {opt.votes.slice(0, 3).map((v, i) => (
                     <span key={v.voter_id}>

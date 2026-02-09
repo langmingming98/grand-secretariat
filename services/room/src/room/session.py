@@ -94,6 +94,8 @@ class StreamHandler:
                     await self._handle_add_llm(client_msg.add_llm)
                 elif payload == "update_llm":
                     await self._handle_update_llm(client_msg.update_llm)
+                elif payload == "remove_llm":
+                    await self._handle_remove_llm(client_msg.remove_llm)
                 elif payload == "create_poll":
                     await self._handle_create_poll(client_msg.create_poll)
                 elif payload == "cast_vote":
@@ -142,6 +144,7 @@ class StreamHandler:
             display_name=join.display_name,
             role=join.role,
             title=join.title,
+            avatar=join.avatar,
         )
 
         # Register handler for broadcasts
@@ -152,17 +155,18 @@ class StreamHandler:
         online_ids = self._registry.get_online_user_ids(join.room_id)
         all_participants = await self._store.get_participants(join.room_id)
 
-        # Online human participants
-        online_participants = [
+        # All human participants with online status
+        all_participants_proto = [
             room_pb2.Participant(
                 id=p.user_id,
                 name=p.display_name,
                 role=p.role,
                 type=room_pb2.HUMAN,
                 title=p.title,
+                is_online=p.user_id in online_ids,
+                avatar=p.avatar,
             )
             for p in all_participants
-            if p.user_id in online_ids
         ]
 
         # Load active polls
@@ -170,7 +174,7 @@ class StreamHandler:
 
         room_state = room_pb2.RoomState(
             room=self._store.room_to_proto(room),
-            participants=online_participants,
+            participants=all_participants_proto,
             messages=[self._store.message_to_proto(m) for m in messages],
             polls=[self._store.poll_to_proto(p) for p in active_polls],
         )
@@ -271,6 +275,8 @@ class StreamHandler:
             persona=update.persona if update.HasField("persona") else None,
             display_name=update.display_name if update.HasField("display_name") else None,
             title=update.title if update.HasField("title") else None,
+            chat_style=update.chat_style if update.HasField("chat_style") else None,
+            avatar=update.avatar if update.HasField("avatar") else None,
         )
         if updated:
             await self._registry.broadcast(
@@ -281,9 +287,28 @@ class StreamHandler:
             )
             logger.info("LLM %s updated in room %s", update.llm_id, self._room_id)
 
+    async def _handle_remove_llm(self, remove: room_pb2.RemoveLLM) -> None:
+        if not self._room_id:
+            return
+        removed = await self._store.remove_llm(self._room_id, remove.llm_id)
+        if removed:
+            await self._registry.broadcast(
+                self._room_id,
+                room_pb2.ServerEvent(
+                    llm_removed=room_pb2.LLMRemoved(llm_id=remove.llm_id)
+                ),
+            )
+            logger.info("LLM %s removed from room %s", remove.llm_id, self._room_id)
+
     async def _handle_interrupt(self, interrupt: room_pb2.InterruptLLM) -> None:
-        # TODO: cancel specific in-flight LLM tasks by ID
-        logger.info("Interrupt requested for LLM %s", interrupt.llm_id)
+        if not self._room_id:
+            return
+        cancelled = await self._llm_dispatcher.cancel_llm_task(interrupt.llm_id, self._room_id)
+        logger.info(
+            "Interrupt requested for LLM %s: %s",
+            interrupt.llm_id,
+            "cancelled" if cancelled else "no active task",
+        )
 
     async def _handle_create_poll(self, create: room_pb2.CreatePoll) -> None:
         if not self._room_id or not self._user_id:

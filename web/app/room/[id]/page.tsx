@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useRoomSocket } from '../../hooks/useRoomSocket'
 import { llmDisplayLabel } from '../../lib/utils'
@@ -31,6 +31,39 @@ export default function RoomPage() {
   const [debugMode, setDebugModeState] = useState(false)
   const [showPollModal, setShowPollModal] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
+  const [autoScrollEnabled, setAutoScrollEnabled] = useState(true)
+  const isAutoScrollingRef = useRef(false) // Flag to ignore scroll events during programmatic scroll
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const prevScrollHeightRef = useRef<number>(0) // For preserving scroll position when prepending
+  const prevMessageCountRef = useRef<number>(0)
+
+  // Track scroll: disable auto-scroll when user scrolls away from bottom, load history when near top
+  const handleScroll = useCallback(() => {
+    const container = messagesContainerRef.current
+    if (!container) return
+
+    // Ignore scroll events triggered by our own scrollIntoView
+    if (isAutoScrollingRef.current) return
+
+    const { scrollTop, scrollHeight, clientHeight } = container
+    const distanceFromBottom = scrollHeight - scrollTop - clientHeight
+    const isNearBottom = distanceFromBottom < 100 // 100px threshold
+
+    if (isNearBottom) {
+      // User scrolled to bottom - re-enable auto-scroll
+      setAutoScrollEnabled(true)
+    } else {
+      // User scrolled away from bottom - disable auto-scroll
+      setAutoScrollEnabled(false)
+    }
+
+    // Load more history when scrolled near top
+    const isNearTop = scrollTop < 100
+    if (isNearTop && hasMoreHistory && !isLoadingHistory) {
+      loadHistory()
+    }
+  }, [hasMoreHistory, isLoadingHistory, loadHistory])
 
   // Initialize debug mode from localStorage on mount
   useEffect(() => {
@@ -54,15 +87,21 @@ export default function RoomPage() {
     error,
     isConnected,
     wasConnected,
+    isReconnecting,
+    reconnectAttempt,
+    isLoadingHistory,
+    hasMoreHistory,
     connect,
     disconnect,
     sendMessage,
     sendTyping,
     addLLM,
     updateLLM,
+    removeLLM,
     createPoll,
     castVote,
     closePoll,
+    loadHistory,
   } = useRoomSocket(roomId)
 
   const handleJoin = useCallback(
@@ -97,10 +136,50 @@ export default function RoomPage() {
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-scroll on new messages
+  // Auto-scroll on new messages only if auto-scroll is enabled
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, streamingLLMs])
+    if (autoScrollEnabled && messagesEndRef.current) {
+      // Set flag to ignore scroll events during programmatic scroll
+      isAutoScrollingRef.current = true
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' })
+
+      // Clear flag after scroll animation completes (smooth scroll takes ~300-500ms)
+      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current)
+      scrollTimeoutRef.current = setTimeout(() => {
+        isAutoScrollingRef.current = false
+      }, 500)
+    }
+  }, [messages, streamingLLMs, autoScrollEnabled])
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current)
+    }
+  }, [])
+
+  // Preserve scroll position when prepending older messages
+  // Save scrollHeight before render
+  useEffect(() => {
+    const container = messagesContainerRef.current
+    if (container) {
+      prevScrollHeightRef.current = container.scrollHeight
+      prevMessageCountRef.current = messages.length
+    }
+  })
+
+  // Adjust scroll position after render if messages were prepended
+  useLayoutEffect(() => {
+    const container = messagesContainerRef.current
+    if (!container) return
+
+    // Check if messages were prepended (more messages, scroll was at top area)
+    const scrollHeightDiff = container.scrollHeight - prevScrollHeightRef.current
+    if (scrollHeightDiff > 0 && container.scrollTop < 150) {
+      // Messages were prepended, adjust scroll to maintain position
+      container.scrollTop = scrollHeightDiff
+    }
+  }, [messages.length])
 
   const handleSend = useCallback(
     (content: string, mentions: string[], msgReplyTo?: string) => {
@@ -164,7 +243,16 @@ export default function RoomPage() {
                 {copied ? 'Copied!' : 'Copy link'}
               </button>
               {wasConnected && !isConnected && (
-                <span className="text-xs text-red-400 flex-shrink-0">Disconnected</span>
+                <span className={`text-xs flex-shrink-0 flex items-center gap-1 ${isReconnecting ? 'text-amber-500' : 'text-red-400'}`}>
+                  {isReconnecting ? (
+                    <>
+                      <div className="w-3 h-3 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+                      Reconnecting{reconnectAttempt > 1 ? ` (${reconnectAttempt})` : '...'}
+                    </>
+                  ) : (
+                    'Disconnected'
+                  )}
+                </span>
               )}
             </div>
           </div>
@@ -200,13 +288,21 @@ export default function RoomPage() {
           >
             {debugMode ? 'Debug' : 'Debug'}
           </button>
-          <span>{participants.length} online</span>
+          <span>{participants.filter(p => p.is_online !== false).length} online</span>
         </div>
       </div>
 
-      {/* Error banner */}
-      {error && (
-        <div className="flex-shrink-0 bg-red-900/30 border-b border-red-800 px-4 py-2 text-sm text-red-400">
+      {/* Reconnecting banner */}
+      {isReconnecting && (
+        <div className="flex-shrink-0 bg-amber-50 border-b border-amber-200 px-4 py-2 text-sm text-amber-700 flex items-center gap-2">
+          <div className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+          Reconnecting to room... {reconnectAttempt > 1 && `(attempt ${reconnectAttempt})`}
+        </div>
+      )}
+
+      {/* Error banner - only show after first successful connection to avoid flash */}
+      {error && wasConnected && !isReconnecting && (
+        <div className="flex-shrink-0 bg-red-50 border-b border-red-200 px-4 py-2 text-sm text-red-600">
           {error}
         </div>
       )}
@@ -215,12 +311,47 @@ export default function RoomPage() {
       <div className="flex-1 flex overflow-hidden">
         {/* Messages */}
         <div className="flex-1 flex flex-col">
-          <div className="flex-1 overflow-y-auto px-4 py-3">
-            {messages.length === 0 && (
-              <p className="text-slate-500 text-center mt-8">
-                No messages yet. Say something or @mention an LLM!
-              </p>
+          <div
+            ref={messagesContainerRef}
+            onScroll={handleScroll}
+            className="flex-1 overflow-y-auto px-4 py-3"
+          >
+            {messages.length === 0 && !room && (
+              <div className="flex flex-col items-center justify-center mt-16">
+                <div className="w-8 h-8 border-2 border-slate-300 border-t-blue-500 rounded-full animate-spin" />
+                <p className="text-slate-500 text-sm mt-3">Loading room...</p>
+              </div>
             )}
+            {messages.length === 0 && room && (
+              <div className="flex flex-col items-center justify-center mt-16 text-slate-500">
+                <svg className="w-12 h-12 mb-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+                <p className="text-sm">No messages yet. Say something or @mention an LLM!</p>
+              </div>
+            )}
+
+            {/* Load more history indicator */}
+            {messages.length > 0 && (
+              <div className="flex justify-center mb-4">
+                {isLoadingHistory ? (
+                  <div className="flex items-center gap-2 text-slate-500 text-sm">
+                    <div className="w-4 h-4 border-2 border-slate-300 border-t-blue-500 rounded-full animate-spin" />
+                    Loading older messages...
+                  </div>
+                ) : hasMoreHistory ? (
+                  <button
+                    onClick={loadHistory}
+                    className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
+                  >
+                    Load older messages
+                  </button>
+                ) : (
+                  <span className="text-xs text-slate-400">Beginning of conversation</span>
+                )}
+              </div>
+            )}
+
             {messages.map((msg) => {
               // If message has a poll_id, render as poll
               if (msg.poll_id) {
@@ -245,8 +376,10 @@ export default function RoomPage() {
                   message={msg}
                   isOwn={msg.sender.id === userId}
                   llms={llms}
+                  participants={participants}
                   messages={messages}
                   onReply={setReplyTo}
+                  onUpdateLLM={updateLLM}
                   debugMode={debugMode}
                   messageRef={(el) => {
                     if (el) el.id = `msg-${msg.id}`
@@ -326,6 +459,7 @@ export default function RoomPage() {
           roomDescription={room?.description}
           onAddLLM={addLLM}
           onUpdateLLM={updateLLM}
+          onRemoveLLM={removeLLM}
           onUpdateSelf={handleUpdateSelf}
         />
       </div>

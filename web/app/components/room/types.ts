@@ -23,8 +23,10 @@ export interface SidebarEntry {
   label: string // name + model for LLMs
   type: 'human' | 'llm'
   title?: string
+  avatar?: string
   isSelf: boolean
   isStreaming: boolean
+  isOnline: boolean
 }
 
 export interface OpenRouterModel {
@@ -48,3 +50,21 @@ export const PERSONA_PRESETS = [
   { id: 'critic', label: 'Critic', template: 'You are {name}, a critical thinker. Question assumptions, identify issues, and stress-test ideas.' },
   { id: 'concise', label: 'Brief', template: 'You are {name}. Be extremely brief - bullet points, short sentences, no fluff.' },
 ] as const
+
+// Chat style options (matches proto enum values)
+export const CHAT_STYLES = [
+  { id: 0, label: 'Default', description: 'Normal response length' },
+  { id: 1, label: 'Conversational', description: 'Short, punchy (1-2 sentences)' },
+  { id: 2, label: 'Detailed', description: 'Thorough explanations' },
+  { id: 3, label: 'Bullet', description: 'Structured lists' },
+] as const
+
+export type ChatStyleId = 0 | 1 | 2 | 3
+
+// Avatar presets - emoji-based avatars
+export const AVATAR_PRESETS = {
+  // For humans
+  human: ['👤', '🧑', '👨', '👩', '🧑‍💻', '👨‍💻', '👩‍💻', '🧑‍💼', '👨‍💼', '👩‍💼', '🧑‍🔬', '🧑‍🎨', '🦸', '🦹', '🧙', '🧝'],
+  // For LLMs
+  llm: ['🤖', '🧠', '💡', '⚡', '🔮', '🎯', '🦾', '🌟', '🔥', '💎', '🎭', '🦉', '🐙', '🦊', '🐺', '🦁'],
+} as const

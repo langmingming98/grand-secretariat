@@ -26,7 +26,12 @@ Gateway (FastAPI :8000)
 **Services:**
 - `services/chat/` - gRPC chat service. Streams LLM responses from OpenRouter. Provider pattern in `src/chat/providers/openrouter.py`
 - `services/room/` - gRPC room service. Manages rooms, messages, participants, @mention dispatch. In-memory store (async interface ready for DynamoDB swap). Handler registry for broadcasting (ready for Redis pub/sub swap)
-- `services/gateway/` - FastAPI gateway. Translates WebSocket JSON ↔ gRPC protobuf. All endpoints in `src/gateway/main.py`
+- `services/gateway/` - FastAPI gateway. Translates WebSocket JSON ↔ gRPC protobuf. Modular structure:
+  - `main.py` - App setup, CORS, router registration
+  - `models.py` - Pydantic request/response models
+  - `converters.py` - Proto enum → string conversions
+  - `routers/` - REST endpoints (rooms.py, models.py)
+  - `websockets/` - WebSocket handlers (room.py, chat.py)
 - `web/` - Next.js frontend. Room list, room chat with streaming LLM responses, @mention autocomplete, typing indicators
 
 **Proto definitions:** `proto/pb/api/room/room.proto`, `proto/pb/api/chat/chat.proto`, `proto/pb/shared/content.proto`
@@ -45,15 +50,28 @@ Gateway (FastAPI :8000)
 # Install all workspace dependencies (from root)
 uv sync
 
-# Start all backend services for local dev
-# IMPORTANT: chat service needs .env sourced for the OpenRouter API key
-cd services/chat && source .env && export OPENROUTER_API_KEY && uv run python src/chat/main.py  # port 50051
-cd services/room && uv run python src/room/main.py          # port 50052
+# Kill existing processes on service ports (if needed)
+lsof -ti:50051 | xargs kill -9  # chat service
+lsof -ti:50052 | xargs kill -9  # room service
+lsof -ti:8000  | xargs kill -9  # gateway
+lsof -ti:3000  | xargs kill -9  # frontend
+
+# Start all backend services for local dev (run each in separate terminal)
+# Chat service - MUST source .env for API key (use set -a to auto-export)
+cd services/chat && set -a && source .env && set +a && uv run python src/chat/main.py
+
+# Room service
+cd services/room && uv run python src/room/main.py
+
+# Gateway (with hot reload)
 cd services/gateway && uv run uvicorn gateway.main:app --reload --port 8000
 
 # Frontend
 cd web && npm run dev        # port 3000
 cd web && npm run build      # production build
+
+# Verify all services are running
+lsof -i:50051 -i:50052 -i:8000 -i:3000 -sTCP:LISTEN
 
 # Proto generation
 buf generate                 # generates Python stubs to libs/pb/src
@@ -62,6 +80,14 @@ buf generate                 # generates Python stubs to libs/pb/src
 docker-compose up            # local dev (builds from source)
 docker-compose -f docker-compose.prod.yml up  # production (pre-built images)
 ```
+
+**Service ports:**
+| Service | Port | Notes |
+|---------|------|-------|
+| Chat    | 50051 | Requires `OPENROUTER_API_KEY` from `.env` |
+| Room    | 50052 | Connects to Chat service |
+| Gateway | 8000  | Connects to Room + Chat services |
+| Frontend| 3000  | Connects to Gateway |
 
 ## Environment Variables
 
@@ -75,6 +101,25 @@ docker-compose -f docker-compose.prod.yml up  # production (pre-built images)
 - `services/chat/config.yaml` - Model list, gRPC port, provider settings
 - `services/room/config.yaml` - Room service gRPC port, chat service address
 - `buf.gen.yaml` - Protobuf generation config
+
+## Frontend Components
+
+The room UI is built from modular components in `web/app/components/room/`:
+
+| Component | Purpose |
+|-----------|---------|
+| `RoomChat.tsx` | Main chat container with message list and input |
+| `MessageRow.tsx` | Individual message display with reply/mention UI |
+| `StreamingRow.tsx` | Real-time LLM response with streaming chunks |
+| `ParticipantsSidebar.tsx` | Sidebar container with resize |
+| `ParticipantsList.tsx` | Participant entries with online status |
+| `AddLLMForm.tsx` | Modal for adding LLMs with model search |
+| `EditLLMForm.tsx` | Inline LLM editing form |
+| `EditSelfForm.tsx` | User profile editing |
+| `ModelPicker.tsx` | Reusable model search with debounce |
+| `PollDisplay.tsx` | Poll creation and voting UI |
+
+Room creation uses `web/app/components/RoomCreateForm.tsx`.
 
 ## CI/CD
 

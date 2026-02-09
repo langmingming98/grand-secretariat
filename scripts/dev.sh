@@ -44,19 +44,27 @@ fi
 echo -e "${BLUE}Starting Grand Secretariat local dev...${NC}\n"
 
 # Sync dependencies (--all-packages needed for workspace)
-echo -e "${GREEN}[0/3] Syncing dependencies...${NC}"
+echo -e "${GREEN}[0/4] Syncing dependencies...${NC}"
 uv sync --all-packages --quiet
 
 # Start chat service (gRPC :50051)
-echo -e "${GREEN}[1/3] Starting chat service on :50051${NC}"
+echo -e "${GREEN}[1/4] Starting chat service on :50051${NC}"
 cd "$ROOT_DIR/services/chat"
 uv run python src/chat/main.py 2>&1 | sed 's/^/[chat] /' &
 PIDS+=($!)
 cd "$ROOT_DIR"
 sleep 2
 
+# Start room service (gRPC :50052)
+echo -e "${GREEN}[2/4] Starting room service on :50052${NC}"
+cd "$ROOT_DIR/services/room"
+uv run python src/room/main.py 2>&1 | sed 's/^/[room] /' &
+PIDS+=($!)
+cd "$ROOT_DIR"
+sleep 2
+
 # Start gateway (FastAPI :8000)
-echo -e "${GREEN}[2/3] Starting gateway on :8000${NC}"
+echo -e "${GREEN}[3/4] Starting gateway on :8000${NC}"
 cd "$ROOT_DIR/services/gateway"
 uv run uvicorn gateway.main:app --reload --port 8000 2>&1 | sed 's/^/[gateway] /' &
 PIDS+=($!)
@@ -64,7 +72,7 @@ cd "$ROOT_DIR"
 sleep 2
 
 # Start frontend (Next.js :3000)
-echo -e "${GREEN}[3/3] Starting frontend on :3000${NC}"
+echo -e "${GREEN}[4/4] Starting frontend on :3000${NC}"
 cd "$ROOT_DIR/web"
 npm run dev 2>&1 | sed 's/^/[web] /' &
 PIDS+=($!)
@@ -75,6 +83,7 @@ echo -e "${GREEN}All services running!${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo -e "Frontend:     http://localhost:3000"
 echo -e "Gateway:      http://localhost:8000"
+echo -e "Room (gRPC):  localhost:50052"
 echo -e "Chat (gRPC):  localhost:50051"
 echo -e "\nPress Ctrl+C to stop all services"
 

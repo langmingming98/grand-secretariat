@@ -18,12 +18,9 @@ function ReplyPreviewInner({ replyMsg, replyToId }: ReplyPreviewProps) {
     }
   }
 
+  // Don't show generic "replying to message" - either show specific message or nothing
   if (!replyMsg) {
-    return (
-      <div className="text-xs text-slate-500 mb-1 pl-2 border-l-2 border-slate-300">
-        replying to message
-      </div>
-    )
+    return null
   }
 
   const truncated =

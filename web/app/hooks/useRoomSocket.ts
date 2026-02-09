@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { getWsUrl } from '../lib/api'
+import { getWsUrl, getApiBase } from '../lib/api'
 import { stripSenderPrefix } from '../lib/utils'
 
 // ---- Types ----
@@ -12,6 +12,8 @@ export interface Participant {
   role: number
   type: number // 1=human, 2=llm
   title?: string
+  is_online?: boolean
+  avatar?: string  // emoji avatar
 }
 
 export interface ChatMessage {
@@ -29,6 +31,8 @@ export interface LLMInfo {
   display_name: string
   persona?: string
   title?: string
+  chat_style?: number  // 0=default, 1=conversational, 2=detailed, 3=bullet
+  avatar?: string  // emoji avatar
 }
 
 export interface RoomInfo {
@@ -36,6 +40,7 @@ export interface RoomInfo {
   name: string
   description?: string
   created_at: string | null
+  visibility?: 'public' | 'private'
 }
 
 export interface PollVote {
@@ -92,12 +97,35 @@ interface RoomState {
   error: string | null
   isConnected: boolean
   wasConnected: boolean // True after first successful connection
+  isReconnecting: boolean
+  reconnectAttempt: number
+  // History pagination
+  historyCursor: string | null
+  isLoadingHistory: boolean
+  hasMoreHistory: boolean
+}
+
+// Reconnection config
+const RECONNECT_BASE_DELAY = 1000 // 1 second
+const RECONNECT_MAX_DELAY = 30000 // 30 seconds
+const RECONNECT_MAX_ATTEMPTS = 10
+
+interface ConnectionParams {
+  userId: string
+  displayName: string
+  role: string
+  title: string
+  avatar: string
 }
 
 // ---- Hook ----
 
 export function useRoomSocket(roomId: string) {
   const wsRef = useRef<WebSocket | null>(null)
+  const connectionParamsRef = useRef<ConnectionParams | null>(null)
+  const reconnectTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const intentionalCloseRef = useRef(false)
+
   const [state, setState] = useState<RoomState>({
     room: null,
     participants: [],
@@ -109,19 +137,75 @@ export function useRoomSocket(roomId: string) {
     error: null,
     isConnected: false,
     wasConnected: false,
+    isReconnecting: false,
+    reconnectAttempt: 0,
+    historyCursor: null,
+    isLoadingHistory: false,
+    hasMoreHistory: true, // Assume there's history until proven otherwise
   })
 
-  const connect = useCallback(
-    (userId: string, displayName: string, role: string = 'member', title: string = '') => {
+  const scheduleReconnect = useCallback(() => {
+    setState((prev) => {
+      if (prev.reconnectAttempt >= RECONNECT_MAX_ATTEMPTS) {
+        return {
+          ...prev,
+          isReconnecting: false,
+          error: 'Connection lost. Please refresh the page.',
+        }
+      }
+
+      const attempt = prev.reconnectAttempt + 1
+      const delay = Math.min(
+        RECONNECT_BASE_DELAY * Math.pow(2, attempt - 1),
+        RECONNECT_MAX_DELAY
+      )
+
+      console.log(`Scheduling reconnect attempt ${attempt} in ${delay}ms`)
+
+      reconnectTimerRef.current = setTimeout(() => {
+        const params = connectionParamsRef.current
+        if (params) {
+          connectInternal(params.userId, params.displayName, params.role, params.title, params.avatar, true)
+        }
+      }, delay)
+
+      return {
+        ...prev,
+        isReconnecting: true,
+        reconnectAttempt: attempt,
+      }
+    })
+  }, [])
+
+  const connectInternal = useCallback(
+    (userId: string, displayName: string, role: string, title: string, avatar: string, isReconnect: boolean = false) => {
+      // Clear any pending reconnect
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current)
+        reconnectTimerRef.current = null
+      }
+
+      // Close existing connection
       if (wsRef.current) {
+        intentionalCloseRef.current = true
         wsRef.current.close()
       }
+
+      intentionalCloseRef.current = false
 
       const wsUrl = getWsUrl(`/ws/room/${roomId}`)
       const ws = new WebSocket(wsUrl)
 
       ws.onopen = () => {
-        setState((prev) => ({ ...prev, isConnected: true, wasConnected: true, error: null }))
+        console.log('WebSocket connected' + (isReconnect ? ' (reconnected)' : ''))
+        setState((prev) => ({
+          ...prev,
+          isConnected: true,
+          wasConnected: true,
+          isReconnecting: false,
+          reconnectAttempt: 0,
+          error: null,
+        }))
         // Send join message
         ws.send(
           JSON.stringify({
@@ -130,6 +214,7 @@ export function useRoomSocket(roomId: string) {
             name: displayName,
             role,
             title,
+            avatar,
           })
         )
       }
@@ -144,20 +229,40 @@ export function useRoomSocket(roomId: string) {
       }
 
       ws.onerror = () => {
-        setState((prev) => ({
-          ...prev,
-          isConnected: false,
-          error: 'WebSocket connection error',
-        }))
+        console.error('WebSocket error')
+        // Don't set error here - wait for onclose to handle reconnection
       }
 
-      ws.onclose = () => {
+      ws.onclose = (event) => {
+        console.log('WebSocket closed', event.code, event.reason)
+        wsRef.current = null
+
         setState((prev) => ({ ...prev, isConnected: false }))
+
+        // Only attempt reconnect if:
+        // - We have connection params (user was connected)
+        // - Close wasn't intentional (user didn't call disconnect)
+        // - We haven't exceeded max attempts
+        if (
+          connectionParamsRef.current &&
+          !intentionalCloseRef.current
+        ) {
+          scheduleReconnect()
+        }
       }
 
       wsRef.current = ws
     },
-    [roomId]
+    [roomId, scheduleReconnect]
+  )
+
+  const connect = useCallback(
+    (userId: string, displayName: string, role: string = 'member', title: string = '', avatar: string = '') => {
+      // Store connection params for reconnection
+      connectionParamsRef.current = { userId, displayName, role, title, avatar }
+      connectInternal(userId, displayName, role, title, avatar, false)
+    },
+    [connectInternal]
   )
 
   const handleServerEvent = useCallback((data: any) => {
@@ -209,8 +314,8 @@ export function useRoomSocket(roomId: string) {
       case 'user_left':
         setState((prev) => ({
           ...prev,
-          participants: prev.participants.filter(
-            (p) => p.id !== data.user_id
+          participants: prev.participants.map((p) =>
+            p.id === data.user_id ? { ...p, is_online: false } : p
           ),
         }))
         break
@@ -330,6 +435,13 @@ export function useRoomSocket(roomId: string) {
         }))
         break
 
+      case 'llm_removed':
+        setState((prev) => ({
+          ...prev,
+          llms: prev.llms.filter((l) => l.id !== data.llm_id),
+        }))
+        break
+
       case 'poll_created':
         setState((prev) => ({
           ...prev,
@@ -387,6 +499,47 @@ export function useRoomSocket(roomId: string) {
     []
   )
 
+  const loadHistory = useCallback(async () => {
+    // Don't load if already loading or no more history
+    if (state.isLoadingHistory || !state.hasMoreHistory) return
+
+    setState((prev) => ({ ...prev, isLoadingHistory: true }))
+
+    try {
+      const params = new URLSearchParams({ limit: '30' })
+      if (state.historyCursor) {
+        params.set('cursor', state.historyCursor)
+      }
+
+      const res = await fetch(`${getApiBase()}/api/rooms/${roomId}/history?${params}`)
+      if (!res.ok) {
+        throw new Error('Failed to load history')
+      }
+
+      const data = await res.json()
+      const olderMessages: ChatMessage[] = (data.messages || []).map((m: any) => ({
+        id: m.id,
+        sender: m.sender,
+        content: stripSenderPrefix(m.content, m.sender?.name || ''),
+        reply_to: m.reply_to,
+        timestamp: m.timestamp,
+        poll_id: m.poll_id,
+      }))
+
+      setState((prev) => ({
+        ...prev,
+        // Prepend older messages (they come in chronological order from API)
+        messages: [...olderMessages, ...prev.messages],
+        historyCursor: data.next_cursor,
+        hasMoreHistory: data.next_cursor !== null,
+        isLoadingHistory: false,
+      }))
+    } catch (err) {
+      console.error('Failed to load history:', err)
+      setState((prev) => ({ ...prev, isLoadingHistory: false }))
+    }
+  }, [roomId, state.isLoadingHistory, state.hasMoreHistory, state.historyCursor])
+
   const sendTyping = useCallback((is_typing: boolean) => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return
     wsRef.current.send(JSON.stringify({ type: 'typing', is_typing }))
@@ -403,7 +556,7 @@ export function useRoomSocket(roomId: string) {
   )
 
   const addLLM = useCallback(
-    (llm: { id: string; model: string; persona: string; display_name: string; title?: string }) => {
+    (llm: { id: string; model: string; persona: string; display_name: string; title?: string; avatar?: string }) => {
       if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return
       wsRef.current.send(JSON.stringify({ type: 'add_llm', llm }))
     },
@@ -411,12 +564,17 @@ export function useRoomSocket(roomId: string) {
   )
 
   const updateLLM = useCallback(
-    (update: { llm_id: string; model?: string; persona?: string; display_name?: string; title?: string }) => {
+    (update: { llm_id: string; model?: string; persona?: string; display_name?: string; title?: string; chat_style?: number; avatar?: string }) => {
       if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return
       wsRef.current.send(JSON.stringify({ type: 'update_llm', ...update }))
     },
     []
   )
+
+  const removeLLM = useCallback((llm_id: string) => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return
+    wsRef.current.send(JSON.stringify({ type: 'remove_llm', llm_id }))
+  }, [])
 
   const createPoll = useCallback(
     (poll: { question: string; options: { text: string; description?: string }[]; allow_multiple?: boolean; anonymous?: boolean; mandatory?: boolean }) => {
@@ -440,15 +598,35 @@ export function useRoomSocket(roomId: string) {
   }, [])
 
   const disconnect = useCallback(() => {
+    // Clear reconnection state
+    connectionParamsRef.current = null
+    intentionalCloseRef.current = true
+
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current)
+      reconnectTimerRef.current = null
+    }
+
     if (wsRef.current) {
       wsRef.current.close()
       wsRef.current = null
     }
+
+    setState((prev) => ({
+      ...prev,
+      isConnected: false,
+      isReconnecting: false,
+      reconnectAttempt: 0,
+    }))
   }, [])
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      intentionalCloseRef.current = true
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current)
+      }
       if (wsRef.current) {
         wsRef.current.close()
       }
@@ -464,8 +642,10 @@ export function useRoomSocket(roomId: string) {
     interruptLLM,
     addLLM,
     updateLLM,
+    removeLLM,
     createPoll,
     castVote,
     closePoll,
+    loadHistory,
   }
 }

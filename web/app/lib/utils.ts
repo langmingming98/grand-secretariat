@@ -87,6 +87,36 @@ export function parseMentions(text: string): TextSegment[] {
 }
 
 /**
+ * Avatar color utilities
+ */
+
+const AVATAR_COLORS = [
+  'bg-blue-500',
+  'bg-green-500',
+  'bg-purple-500',
+  'bg-orange-500',
+  'bg-pink-500',
+  'bg-teal-500',
+  'bg-indigo-500',
+  'bg-red-500',
+  'bg-cyan-500',
+  'bg-amber-500',
+]
+
+/**
+ * Get a consistent avatar color for a given ID string.
+ * Uses a simple hash to ensure the same ID always gets the same color.
+ */
+export function getAvatarColor(id: string): string {
+  let hash = 0
+  for (let i = 0; i < id.length; i++) {
+    hash = ((hash << 5) - hash) + id.charCodeAt(i)
+    hash = hash & hash // Convert to 32bit integer
+  }
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length]
+}
+
+/**
  * LLM display utilities
  */
 
@@ -108,4 +138,93 @@ export function llmDisplayLabel(llmId: string, llms: LLMInfo[]): string {
   if (name) return name
   if (info.model) return modelIdToDisplayName(info.model)
   return llmId
+}
+
+/**
+ * Emoji shorthand conversion
+ */
+
+const EMOJI_MAP: Record<string, string> = {
+  // Faces
+  ':smile:': '😊',
+  ':grin:': '😁',
+  ':laughing:': '😆',
+  ':joy:': '😂',
+  ':rofl:': '🤣',
+  ':wink:': '😉',
+  ':blush:': '😊',
+  ':thinking:': '🤔',
+  ':confused:': '😕',
+  ':frown:': '🙁',
+  ':cry:': '😢',
+  ':sob:': '😭',
+  ':angry:': '😠',
+  ':rage:': '😡',
+  ':scream:': '😱',
+  ':cool:': '😎',
+  ':nerd:': '🤓',
+  ':eyes:': '👀',
+  ':eye_roll:': '🙄',
+  ':sleeping:': '😴',
+  // Gestures
+  ':thumbsup:': '👍',
+  ':+1:': '👍',
+  ':thumbsdown:': '👎',
+  ':-1:': '👎',
+  ':clap:': '👏',
+  ':wave:': '👋',
+  ':pray:': '🙏',
+  ':muscle:': '💪',
+  ':point_up:': '☝️',
+  ':point_down:': '👇',
+  ':point_left:': '👈',
+  ':point_right:': '👉',
+  ':ok_hand:': '👌',
+  ':raised_hands:': '🙌',
+  ':handshake:': '🤝',
+  // Hearts & symbols
+  ':heart:': '❤️',
+  ':broken_heart:': '💔',
+  ':fire:': '🔥',
+  ':star:': '⭐',
+  ':sparkles:': '✨',
+  ':check:': '✅',
+  ':x:': '❌',
+  ':warning:': '⚠️',
+  ':question:': '❓',
+  ':exclamation:': '❗',
+  ':bulb:': '💡',
+  ':rocket:': '🚀',
+  ':tada:': '🎉',
+  ':trophy:': '🏆',
+  ':100:': '💯',
+  // Objects
+  ':coffee:': '☕',
+  ':beer:': '🍺',
+  ':pizza:': '🍕',
+  ':cake:': '🍰',
+  ':book:': '📖',
+  ':memo:': '📝',
+  ':pencil:': '✏️',
+  ':computer:': '💻',
+  ':phone:': '📱',
+  ':email:': '📧',
+  ':calendar:': '📅',
+  ':clock:': '🕐',
+  ':lock:': '🔒',
+  ':key:': '🔑',
+  ':hammer:': '🔨',
+  ':wrench:': '🔧',
+  ':gear:': '⚙️',
+  ':link:': '🔗',
+  ':bug:': '🐛',
+}
+
+/**
+ * Convert emoji shortcodes like :smile: to actual emoji characters.
+ */
+export function convertEmojiShortcodes(text: string): string {
+  return text.replace(/:[a-z0-9_+-]+:/gi, (match) => {
+    return EMOJI_MAP[match.toLowerCase()] || match
+  })
 }

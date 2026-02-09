@@ -4,6 +4,7 @@ import { memo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { ReplyPreview } from './ReplyPreview'
+import { getAvatarColor } from '../../lib/utils'
 import type { ChatMessage, DisplayMode } from './types'
 
 /**
@@ -42,6 +43,7 @@ function StreamingRowInner({
     : undefined
 
   const avatarLetter = displayName.charAt(0).toUpperCase()
+  const avatarBg = getAvatarColor(llm_id)
 
   // Don't render if no content and not thinking (opt-out case)
   if (!content && !is_thinking) {
@@ -65,7 +67,7 @@ function StreamingRowInner({
   return (
     <div className="group flex gap-3 px-4 py-1.5 bg-blue-50/50">
       {/* Avatar */}
-      <div className="w-9 h-9 rounded bg-blue-500 flex-shrink-0 flex items-center justify-center text-white text-sm font-medium">
+      <div className={`w-9 h-9 rounded ${avatarBg} flex-shrink-0 flex items-center justify-center text-white text-sm font-medium`}>
         {avatarLetter}
       </div>
 

@@ -37,14 +37,14 @@
 - [x] Edit LLM model/persona/title mid-chat (gear icon in sidebar)
 - [x] LLM response no longer prefixes own name
 - [ ] Room settings page (dedicated settings UI)
-- [ ] Better error handling + reconnection on WebSocket drop
+- [x] Better error handling + reconnection on WebSocket drop
 - [ ] UI theme toggle (chat-style vs professional/Slack-style)
 
 ## Phase 4: Polish
-- [ ] Reconnection handling (resync state on WebSocket drop)
-- [ ] Load older history (scroll up pagination — LoadHistory RPC exists)
+- [x] Reconnection handling (resync state on WebSocket drop)
+- [x] Load older history (scroll up pagination — LoadHistory RPC exists)
 - [ ] Context management / compression for long conversations
-- [ ] Interrupt LLM mid-response (proto + handler stubbed, needs cancellation)
+- [x] Interrupt LLM mid-response (proto + handler stubbed, needs cancellation)
 - [x] Room-wide context/description field (injected into all LLM system prompts)
 - [ ] Presets system (predefined personas with optional model, pre-built rooms with participant configs)
 
@@ -70,12 +70,12 @@ Operational and codebase debt discovered during implementation and testing. This
 - [ ] **Add backpressure / bounded buffering to room stream outbound** (`services/room/src/room/session.py`)
 - [ ] **Done means:** outbound queue is bounded and/or slow clients are disconnected gracefully; document behavior.
 
-- [ ] **Implement interrupt cancellation** (`services/room/src/room/session.py`, `services/chat`)
-- [ ] **Done means:** interrupt reliably stops streaming for the targeted response and releases tasks; add an integration test or a reproducible script.
+- [x] **Implement interrupt cancellation** (`services/room/src/room/session.py`, `services/chat`)
+- [x] **Done means:** interrupt reliably stops streaming for the targeted response and releases tasks; add an integration test or a reproducible script.
 
 ### Developer Experience
-- [ ] **Fix local dev script to start all required services** (`scripts/dev.sh`)
-- [ ] **Done means:** `scripts/dev.sh` starts `chat`, `room`, `gateway`, and `web`, prints their ports, and Ctrl+C stops all of them.
+- [x] **Fix local dev script to start all required services** (`scripts/dev.sh`)
+- [x] **Done means:** `scripts/dev.sh` starts `chat`, `room`, `gateway`, and `web`, prints their ports, and Ctrl+C stops all of them.
 
 - [ ] **Make frontend lint non-interactive** (`web/`)
 - [ ] **Done means:** `npm run lint` does not prompt for setup and can run in CI; add ESLint config if needed.

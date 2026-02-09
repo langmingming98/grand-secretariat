@@ -31,13 +31,19 @@ class RoomService(room_pb2_grpc.RoomServicer):
         request: room_pb2.CreateRoomRequest,
         context: grpc.aio.ServicerContext,
     ) -> room_pb2.CreateRoomResponse:
+        # Default to public if unspecified
+        visibility = request.visibility
+        if visibility == room_pb2.ROOM_VISIBILITY_UNSPECIFIED:
+            visibility = room_pb2.ROOM_VISIBILITY_PUBLIC
+
         room_id = await self._store.create_room(
             name=request.name,
             created_by=request.created_by,
             llms=list(request.llms),
             description=request.description,
+            visibility=visibility,
         )
-        logger.info("Created room %s (%s)", room_id, request.name)
+        logger.info("Created room %s (%s) visibility=%s", room_id, request.name, visibility)
         return room_pb2.CreateRoomResponse(room_id=room_id)
 
     async def GetRoom(

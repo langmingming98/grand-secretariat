@@ -39,6 +39,19 @@ enum PollStatus {
   POLL_CLOSED = 2;
 }
 
+enum ChatStyle {
+  CHAT_STYLE_UNSPECIFIED = 0;  // default behavior
+  CHAT_STYLE_CONVERSATIONAL = 1;  // short, punchy responses
+  CHAT_STYLE_DETAILED = 2;  // thorough explanations
+  CHAT_STYLE_BULLET = 3;  // structured lists
+}
+
+enum RoomVisibility {
+  ROOM_VISIBILITY_UNSPECIFIED = 0;  // defaults to public
+  ROOM_VISIBILITY_PUBLIC = 1;       // anyone can see and join
+  ROOM_VISIBILITY_PRIVATE = 2;      // only creator sees in list, link sharing still works
+}
+
 // ---------------------------------------------------------------------------
 // Shared messages
 // ---------------------------------------------------------------------------
@@ -49,6 +62,8 @@ message LLMConfig {
   string persona = 3;         // system prompt / role description
   string display_name = 4;    // human-readable, e.g. "Claude"
   string title = 5;           // job title, e.g. "VP Engineering"
+  ChatStyle chat_style = 6;   // response style (conversational, detailed, bullet)
+  string avatar = 7;          // emoji avatar, e.g. "🤖" or "🧠"
 }
 
 message Participant {
@@ -57,6 +72,8 @@ message Participant {
   Role role = 3;
   ParticipantType type = 4;
   string title = 5;
+  bool is_online = 6;  // Whether participant is currently connected
+  string avatar = 7;   // emoji avatar, e.g. "👤" or "🧑‍💻"
 }
 
 message RoomInfo {
@@ -66,6 +83,7 @@ message RoomInfo {
   string created_by = 4;
   repeated LLMConfig llms = 5;
   string description = 6;  // room-wide context (e.g. "Fintech startup meeting room")
+  RoomVisibility visibility = 7;  // public or private
 }
 
 message Message {
@@ -124,6 +142,7 @@ message CreateRoomRequest {
   // passed explicitly for now while auth is not implemented.
   string created_by = 3;
   string description = 4;  // room-wide context for all LLMs
+  RoomVisibility visibility = 5;  // public (default) or private
 }
 
 message CreateRoomResponse {
@@ -190,6 +209,7 @@ message ClientMessage {
     CreatePoll create_poll = 8;
     CastVote cast_vote = 9;
     ClosePoll close_poll = 10;
+    RemoveLLM remove_llm = 11;
   }
 }
 
@@ -226,6 +246,12 @@ message UpdateLLM {
   optional string persona = 3;
   optional string display_name = 4;
   optional string title = 5;
+  optional ChatStyle chat_style = 6;
+  optional string avatar = 7;
+}
+
+message RemoveLLM {
+  string llm_id = 1;
 }
 
 message JoinRoom {
@@ -236,6 +262,7 @@ message JoinRoom {
   string display_name = 3;
   Role role = 4;
   string title = 5;
+  string avatar = 6;  // emoji avatar
 }
 
 message SendMessage {
@@ -278,7 +305,12 @@ message ServerEvent {
     PollCreated poll_created = 13;
     PollVoted poll_voted = 14;
     PollClosed poll_closed = 15;
+    LLMRemoved llm_removed = 16;
   }
+}
+
+message LLMRemoved {
+  string llm_id = 1;
 }
 
 message PollCreated {
