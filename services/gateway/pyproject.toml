@@ -1,0 +1,22 @@
+[project]
+name = "gateway"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "common",
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "websockets>=12.0",
+    "grpcio>=1.68.0",
+    "httpx>=0.27.0",
+    "slowapi>=0.1.9",
+    "pb",
+]
+
+[tool.uv.sources]
+common = { workspace = true }
+pb = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

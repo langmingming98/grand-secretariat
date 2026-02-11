@@ -1,0 +1,17 @@
+server:
+  grpc:
+    port:
+
+providers:
+  openrouter:
+    enabled: true
+    # api_key: set via CHAT_OPENROUTER_API_KEY env var
+    base_url: https://openrouter.ai/api/v1
+    default_max_tokens: 4096
+    default_models:
+      - openai/gpt-5-mini
+      - anthropic/claude-haiku-4.5
+      - google/gemini-2.5-flash
+      - x-ai/grok-4.1-fast
+    default_reasoning_effort: minimal
+  

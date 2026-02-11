@@ -1,0 +1,40 @@
+# Environment files with secrets
+.env
+*.env
+services/chat/.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+
+# Node
+node_modules/
+.next/
+web/.next/
+web/node_modules/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Keys
+*.pem
+*.key
+
+# Logs
+*.log
+
+# MCP config (browser automation)
+.mcp.json
+.mcp.json.disabled
+
+# Auth (removing for GA)
+.htpasswd

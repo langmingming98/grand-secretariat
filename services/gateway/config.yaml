@@ -1,0 +1,19 @@
+# Gateway configuration
+# Environment variables override these values.
+
+server:
+  host: "0.0.0.0"
+  port: 8000
+
+cors:
+  origins:
+    - "http://localhost:3000"
+  allow_credentials: true
+
+chat_service:
+  host: "localhost"
+  port: 50051
+
+room_service:
+  host: "localhost"
+  port: 50052

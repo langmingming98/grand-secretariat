@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package shared;
+
+message Content {
+  oneof content {
+    string text = 1;
+    // future: image, file, etc
+  }
+}
+
+message Message {
+  MessageRole role = 1;
+  repeated Content contents = 2;
+  repeated ToolCall tool_calls = 3;
+}
+
+enum MessageRole {
+  MESSAGE_ROLE_UNSPECIFIED = 0;
+  USER = 1;
+  ASSISTANT = 2;
+  SYSTEM = 3;
+  TOOL = 4;
+}
+
+message ToolCall {
+  // tool call id
+  string id = 1;
+  // tool name
+  string name = 2;
+  string arguments = 3;
+  // client tool not supported yet
+}
+
+message Delta {
+  MessageRole role = 1;
+  string content = 2;
+  repeated ToolCall tool_calls = 3;
+  // For tool call responses, signals if the model chose to not respond
+  bool opted_out = 4;
+}
