@@ -83,7 +83,7 @@ async def websocket_room_session(websocket: WebSocket, room_id: str):
                 try:
                     await websocket.send_json({
                         "type": "error",
-                        "error": f"Room service error: {e.details()}",
+                        "error": "Connection to room service lost. Please refresh.",
                     })
                 except (WebSocketDisconnect, RuntimeError):
                     pass
@@ -111,7 +111,7 @@ async def websocket_room_session(websocket: WebSocket, room_id: str):
         try:
             await websocket.send_json({
                 "type": "error",
-                "error": f"Gateway error: {type(e).__name__}",
+                "error": "An unexpected error occurred. Please refresh.",
             })
         except (WebSocketDisconnect, RuntimeError):
             pass

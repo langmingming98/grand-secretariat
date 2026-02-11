@@ -12,6 +12,8 @@ All business logic is delegated to routers/ and websockets/ submodules.
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -20,6 +22,8 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
 from common.logging import setup_cloudwatch_logging
+
+logger = logging.getLogger(__name__)
 from gateway.config import load_config
 from gateway.models import HealthResponse, RootResponse
 from gateway.routers import rooms_router, models_router
@@ -40,6 +44,16 @@ app = FastAPI(title="Web Gateway", description="FastAPI gateway for microservice
 # Add rate limiter to app state
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Catch-all exception handler to prevent stack traces from leaking."""
+    logger.exception("Unhandled exception: %s", exc)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "An unexpected error occurred. Please try again."},
+    )
 
 # Configure CORS
 app.add_middleware(

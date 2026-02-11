@@ -211,8 +211,9 @@ async def get_room(room_id: str) -> GetRoomResponse:
         )
     except grpc.RpcError as e:
         if e.code() == grpc.StatusCode.NOT_FOUND:
-            raise HTTPException(status_code=404, detail=e.details())
-        raise
+            raise HTTPException(status_code=404, detail="Room not found")
+        logger.error("Room service error: %s - %s", e.code(), e.details())
+        raise HTTPException(status_code=503, detail="Room service unavailable")
     finally:
         await channel.close()
 
@@ -256,8 +257,9 @@ async def load_history(
         )
     except grpc.RpcError as e:
         if e.code() == grpc.StatusCode.NOT_FOUND:
-            raise HTTPException(status_code=404, detail=e.details())
-        raise
+            raise HTTPException(status_code=404, detail="Room not found")
+        logger.error("Room service error: %s - %s", e.code(), e.details())
+        raise HTTPException(status_code=503, detail="Room service unavailable")
     finally:
         await channel.close()
 

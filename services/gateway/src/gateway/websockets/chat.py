@@ -108,10 +108,11 @@ async def websocket_chat_stream(websocket: WebSocket):
     except asyncio.CancelledError:
         raise
     except grpc.RpcError as e:
+        logger.warning("gRPC error in chat WebSocket: %s - %s", e.code(), e.details())
         try:
             await websocket.send_json({
                 "type": "error",
-                "error": f"gRPC error: {e.code()} - {e.details()}",
+                "error": "AI service temporarily unavailable. Please try again.",
             })
         except (WebSocketDisconnect, RuntimeError):
             pass
@@ -124,7 +125,7 @@ async def websocket_chat_stream(websocket: WebSocket):
         try:
             await websocket.send_json({
                 "type": "error",
-                "error": f"Server error: {type(e).__name__}",
+                "error": "An unexpected error occurred. Please try again.",
             })
         except (WebSocketDisconnect, RuntimeError):
             pass
