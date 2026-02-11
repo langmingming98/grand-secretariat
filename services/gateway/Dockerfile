@@ -6,17 +6,19 @@ RUN pip install uv
 # 1. Copy only dependency metadata (cached unless deps change)
 COPY pyproject.toml uv.lock ./
 COPY libs/pb/pyproject.toml ./libs/pb/pyproject.toml
+COPY libs/common/pyproject.toml ./libs/common/pyproject.toml
 COPY services/gateway/pyproject.toml ./services/gateway/pyproject.toml
 
 # 2. Stub out packages so uv sync can resolve without full source
-RUN mkdir -p libs/pb/src/pb services/gateway/src/gateway && \
-    touch libs/pb/src/pb/__init__.py services/gateway/src/gateway/__init__.py
+RUN mkdir -p libs/pb/src/pb libs/common/src/common services/gateway/src/gateway && \
+    touch libs/pb/src/pb/__init__.py libs/common/src/common/__init__.py services/gateway/src/gateway/__init__.py
 
 # 3. Install deps (this layer is cached when only source code changes)
 RUN uv sync --frozen
 
 # 4. Copy actual source
 COPY libs/pb ./libs/pb
+COPY libs/common ./libs/common
 COPY services/gateway ./services/gateway
 
 WORKDIR /app/services/gateway
