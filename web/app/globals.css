@@ -2,6 +2,328 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  @apply bg-slate-50 text-slate-900;
+/* ========================================
+   Grand Secretariat Design System
+   Woodblock Print Aesthetic
+   Inspired by: Omnipotent Youth Society album art
+   ======================================== */
+
+@layer base {
+  body {
+    @apply bg-canvas-100 text-ink-900 font-sans;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@layer components {
+  /* ----------------------------------------
+     Woodblock / Canvas Textures
+     ---------------------------------------- */
+
+  /* Aged canvas - subtle grain, not noisy */
+  .bg-canvas-texture {
+    background-color: #d9d3c5;
+    background-image:
+      url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='grain'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.4' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23grain)' opacity='0.08'/%3E%3C/svg%3E");
+  }
+
+  /* Solid canvas - no texture, just the color */
+  .bg-canvas-solid {
+    background-color: #d9d3c5;
+  }
+
+  /* Rice paper - lighter variant */
+  .bg-rice-paper {
+    background-color: #e8e4dc;
+    background-image:
+      url("data:image/svg+xml,%3Csvg viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='paper'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23paper)' opacity='0.08'/%3E%3C/svg%3E");
+  }
+
+  /* Deep ink background with texture */
+  .bg-ink-texture {
+    background-color: #1c1a18;
+    background-image:
+      url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='ink'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23ink)'/%3E%3C/svg%3E");
+    background-blend-mode: soft-light;
+  }
+
+  /* Bold vermillion background */
+  .bg-vermillion-solid {
+    background-color: #b91c1c;
+  }
+
+  /* Vermillion with woodblock texture - slightly muted/aged */
+  .bg-vermillion-texture {
+    background-color: #a51b1b;
+    background-image:
+      url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    background-blend-mode: multiply;
+  }
+
+  /* ----------------------------------------
+     Woodblock Print Effects
+     ---------------------------------------- */
+
+  /* Woodblock frame - rough carved border */
+  .woodblock-frame {
+    @apply relative;
+    @apply border-4 border-ink-900;
+    box-shadow:
+      inset 2px 2px 0 rgba(0, 0, 0, 0.1),
+      inset -2px -2px 0 rgba(255, 255, 255, 0.05);
+  }
+
+  /* Woodblock text - rough ink edges */
+  .text-woodblock {
+    text-shadow:
+      1px 0 0 currentColor,
+      -1px 0 0 currentColor,
+      0 1px 0 currentColor,
+      0 -1px 0 currentColor;
+  }
+
+  /* Stamp/seal effect - traditional Chinese seal */
+  .seal-stamp {
+    @apply inline-flex items-center justify-center;
+    @apply px-3 py-1.5;
+    @apply border-2 border-seal-600;
+    @apply text-seal-600 font-bold;
+    @apply rotate-[-2deg];
+    box-shadow:
+      inset 0 0 0 1px rgba(204, 51, 51, 0.3),
+      2px 2px 0 rgba(0, 0, 0, 0.1);
+  }
+
+  .seal-stamp-filled {
+    @apply inline-flex items-center justify-center;
+    @apply px-3 py-1.5;
+    @apply bg-seal-600 text-white;
+    @apply border-2 border-seal-700;
+    @apply font-bold;
+    @apply rotate-[-2deg];
+    box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.2);
+  }
+
+  /* ----------------------------------------
+     Typography
+     ---------------------------------------- */
+
+  /* Brush calligraphy - logo only */
+  .heading-brush {
+    @apply font-brush;
+    @apply text-ink-950;
+    letter-spacing: 0.1em;
+  }
+
+  /* English display headers */
+  .heading-display {
+    @apply font-display font-semibold;
+    @apply tracking-widest uppercase;
+    @apply text-ink-900;
+    letter-spacing: 0.2em;
+  }
+
+  /* Chinese text - serif */
+  .text-chinese {
+    @apply font-serif-tc;
+  }
+
+  /* ----------------------------------------
+     Cards - Woodblock Style
+     ---------------------------------------- */
+
+  /* Card with canvas background */
+  .card-canvas {
+    @apply bg-canvas-200 rounded-sm;
+    @apply border border-canvas-400;
+    @apply shadow-sm;
+  }
+
+  /* Card with ink border */
+  .card-ink {
+    @apply bg-canvas-100 rounded-sm;
+    @apply border-2 border-ink-800;
+    box-shadow: 3px 3px 0 rgba(28, 26, 24, 0.15);
+  }
+
+  /* Vermillion accent card */
+  .card-vermillion {
+    @apply bg-canvas-100 rounded-sm;
+    @apply border-l-4 border-l-vermillion-700;
+    @apply border border-canvas-300;
+  }
+
+  /* ----------------------------------------
+     Buttons - Print Style
+     ---------------------------------------- */
+
+  /* Primary button - ink style */
+  .btn-ink {
+    @apply px-6 py-3 rounded-sm;
+    @apply bg-ink-900 text-canvas-100;
+    @apply font-sans font-semibold tracking-wide uppercase text-sm;
+    @apply border-2 border-ink-950;
+    @apply transition-all duration-200;
+    box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.2);
+  }
+
+  .btn-ink:hover {
+    @apply bg-ink-800;
+    box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.25);
+    transform: translate(-1px, -1px);
+  }
+
+  /* Vermillion button */
+  .btn-vermillion {
+    @apply px-6 py-3 rounded-sm;
+    @apply bg-vermillion-700 text-white;
+    @apply font-sans font-semibold tracking-wide uppercase text-sm;
+    @apply border-2 border-vermillion-800;
+    @apply transition-all duration-200;
+    box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.2);
+  }
+
+  .btn-vermillion:hover {
+    @apply bg-vermillion-600;
+    box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.25);
+    transform: translate(-1px, -1px);
+  }
+
+  /* Outline button */
+  .btn-outline {
+    @apply px-6 py-3 rounded-sm;
+    @apply bg-transparent text-ink-800;
+    @apply font-sans font-semibold tracking-wide uppercase text-sm;
+    @apply border-2 border-ink-400;
+    @apply transition-all duration-200;
+  }
+
+  .btn-outline:hover {
+    @apply border-ink-600 text-ink-900;
+    @apply bg-canvas-300/50;
+  }
+
+  /* ----------------------------------------
+     Decorative Elements
+     ---------------------------------------- */
+
+  /* Horizontal rule - woodblock style */
+  .divider-woodblock {
+    @apply h-px my-8;
+    @apply bg-ink-300;
+  }
+
+  /* Divider with center ornament */
+  .divider-ornament {
+    @apply relative h-px my-8;
+    @apply bg-canvas-400;
+  }
+
+  .divider-ornament::before {
+    content: '◆';
+    @apply absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2;
+    @apply bg-canvas-200 px-3;
+    @apply text-ink-400 text-xs;
+  }
+
+  /* ----------------------------------------
+     Chat Message Styles
+     ---------------------------------------- */
+
+  /* Message bubble - human */
+  .message-human {
+    @apply bg-canvas-100 border border-canvas-400;
+    @apply rounded-sm;
+    @apply shadow-sm;
+  }
+
+  /* Message bubble - LLM base */
+  .message-llm {
+    @apply rounded-sm;
+    @apply border-l-4;
+  }
+
+  .message-llm-vermillion {
+    @apply bg-vermillion-50 border-vermillion-600;
+    @apply border border-vermillion-200;
+  }
+
+  .message-llm-jade {
+    @apply bg-jade-50 border-jade-600;
+    @apply border border-jade-200;
+  }
+
+  .message-llm-cyber {
+    @apply bg-cyber-50 border-cyber-600;
+    @apply border border-cyber-200;
+  }
+
+  .message-llm-bronze {
+    @apply bg-bronze-50 border-bronze-600;
+    @apply border border-bronze-200;
+  }
+
+  /* ----------------------------------------
+     Avatar Styles
+     ---------------------------------------- */
+
+  .avatar {
+    @apply w-10 h-10 rounded-sm;
+    @apply flex items-center justify-center;
+    @apply font-sans font-bold text-sm;
+    @apply border-2;
+  }
+
+  .avatar-human {
+    @apply bg-jade-600 text-white border-jade-700;
+  }
+
+  .avatar-vermillion {
+    @apply bg-vermillion-700 text-white border-vermillion-800;
+  }
+
+  .avatar-jade {
+    @apply bg-jade-600 text-white border-jade-700;
+  }
+
+  .avatar-cyber {
+    @apply bg-cyber-600 text-white border-cyber-700;
+  }
+
+  .avatar-bronze {
+    @apply bg-bronze-600 text-white border-bronze-700;
+  }
+
+  /* ----------------------------------------
+     Scrollbar - Minimal
+     ---------------------------------------- */
+
+  .scrollbar-canvas::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .scrollbar-canvas::-webkit-scrollbar-track {
+    @apply bg-canvas-300;
+  }
+
+  .scrollbar-canvas::-webkit-scrollbar-thumb {
+    @apply bg-ink-300 rounded-sm;
+  }
+
+  .scrollbar-canvas::-webkit-scrollbar-thumb:hover {
+    @apply bg-ink-400;
+  }
+}
+
+@layer utilities {
+  /* Text rendering for calligraphy fonts */
+  .text-render-optimized {
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
 }

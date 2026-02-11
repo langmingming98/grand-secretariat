@@ -224,13 +224,13 @@ export default function RoomPage() {
   }
 
   return (
-    <div className="h-screen bg-slate-50 text-slate-900 flex flex-col">
+    <div className="h-screen bg-canvas-100 text-ink-900 flex flex-col">
       {/* Header */}
-      <div className="flex-shrink-0 border-b border-slate-200 px-4 py-3 flex items-center justify-between bg-white">
+      <div className="flex-shrink-0 border-b border-canvas-300 px-4 py-3 flex items-center justify-between bg-canvas-200">
         <div className="flex items-center gap-3 min-w-0 flex-1">
           <button
             onClick={() => router.push('/rooms')}
-            className="text-slate-500 hover:text-slate-900 text-sm flex-shrink-0"
+            className="text-ink-500 hover:text-ink-900 text-sm flex-shrink-0"
           >
             &larr; Rooms
           </button>
@@ -239,15 +239,15 @@ export default function RoomPage() {
               <h1 className="text-lg font-medium truncate">{room?.name || 'Loading...'}</h1>
               <button
                 onClick={handleCopyLink}
-                className="text-slate-500 hover:text-slate-900 text-xs px-2 py-1 rounded border border-slate-300 hover:border-slate-400 transition-colors flex-shrink-0"
+                className="text-ink-500 hover:text-ink-900 text-xs px-2 py-1 rounded-sm border border-canvas-400 hover:border-ink-400 transition-colors flex-shrink-0"
               >
                 {copied ? 'Copied!' : 'Copy link'}
               </button>
               {wasConnected && !isConnected && (
-                <span className={`text-xs flex-shrink-0 flex items-center gap-1 ${isReconnecting ? 'text-amber-500' : 'text-red-400'}`}>
+                <span className={`text-xs flex-shrink-0 flex items-center gap-1 ${isReconnecting ? 'text-bronze-600' : 'text-vermillion-600'}`}>
                   {isReconnecting ? (
                     <>
-                      <div className="w-3 h-3 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+                      <div className="w-3 h-3 border-2 border-bronze-500 border-t-transparent rounded-full animate-spin" />
                       Reconnecting{reconnectAttempt > 1 ? ` (${reconnectAttempt})` : '...'}
                     </>
                   ) : (
@@ -258,21 +258,21 @@ export default function RoomPage() {
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-3 text-xs text-slate-500">
+        <div className="flex items-center gap-3 text-xs text-ink-500">
           <button
             onClick={() => setShowPollModal(true)}
             disabled={!isConnected}
-            className="px-2 py-1 rounded border border-slate-300 hover:border-slate-400 text-slate-600 disabled:opacity-50 transition-colors"
+            className="px-2 py-1 rounded-sm border border-canvas-400 hover:border-ink-400 text-ink-600 disabled:opacity-50 transition-colors"
             title="Create a poll"
           >
-            📊 Poll
+            Poll
           </button>
           <button
             onClick={() => setDisplayMode(displayMode === 'stream' ? 'slack' : 'stream')}
-            className={`px-2 py-1 rounded border transition-colors ${
+            className={`px-2 py-1 rounded-sm border transition-colors ${
               displayMode === 'slack'
-                ? 'border-blue-400 bg-blue-50 text-blue-700'
-                : 'border-slate-300 hover:border-slate-400 text-slate-600'
+                ? 'border-ink-500 bg-ink-100 text-ink-800'
+                : 'border-canvas-400 hover:border-ink-400 text-ink-600'
             }`}
             title={displayMode === 'stream' ? 'Switch to Slack mode (paragraphs)' : 'Switch to Stream mode (live)'}
           >
@@ -280,10 +280,10 @@ export default function RoomPage() {
           </button>
           <button
             onClick={handleToggleDebug}
-            className={`px-2 py-1 rounded border transition-colors ${
+            className={`px-2 py-1 rounded-sm border transition-colors ${
               debugMode
-                ? 'border-amber-400 bg-amber-50 text-amber-700'
-                : 'border-slate-300 hover:border-slate-400 text-slate-600'
+                ? 'border-bronze-500 bg-bronze-50 text-bronze-700'
+                : 'border-canvas-400 hover:border-ink-400 text-ink-600'
             }`}
             title={debugMode ? 'Hide debug info (empty messages, etc.)' : 'Show debug info (empty messages, etc.)'}
           >
@@ -295,15 +295,15 @@ export default function RoomPage() {
 
       {/* Reconnecting banner */}
       {isReconnecting && (
-        <div className="flex-shrink-0 bg-amber-50 border-b border-amber-200 px-4 py-2 text-sm text-amber-700 flex items-center gap-2">
-          <div className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+        <div className="flex-shrink-0 bg-bronze-50 border-b border-bronze-200 px-4 py-2 text-sm text-bronze-700 flex items-center gap-2">
+          <div className="w-4 h-4 border-2 border-bronze-500 border-t-transparent rounded-full animate-spin" />
           Reconnecting to room... {reconnectAttempt > 1 && `(attempt ${reconnectAttempt})`}
         </div>
       )}
 
       {/* Error banner - only show after first successful connection to avoid flash */}
       {error && wasConnected && !isReconnecting && (
-        <div className="flex-shrink-0 bg-red-50 border-b border-red-200 px-4 py-2 text-sm text-red-600">
+        <div className="flex-shrink-0 bg-vermillion-50 border-b border-vermillion-200 px-4 py-2 text-sm text-vermillion-700">
           {error}
         </div>
       )}
@@ -319,36 +319,34 @@ export default function RoomPage() {
           >
             {messages.length === 0 && !room && (
               <div className="flex flex-col items-center justify-center mt-16">
-                <div className="w-8 h-8 border-2 border-slate-300 border-t-blue-500 rounded-full animate-spin" />
-                <p className="text-slate-500 text-sm mt-3">Loading room...</p>
+                <div className="w-8 h-8 border-2 border-canvas-400 border-t-vermillion-600 rounded-full animate-spin" />
+                <p className="text-ink-500 text-sm mt-3">Loading room...</p>
               </div>
             )}
             {messages.length === 0 && room && (
-              <div className="flex flex-col items-center justify-center mt-16 text-slate-500">
-                <svg className="w-12 h-12 mb-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="flex flex-col items-center justify-center mt-16 text-ink-500">
+                <svg className="w-12 h-12 mb-3 text-canvas-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
                 <p className="text-sm">No messages yet. Say something or @mention an LLM!</p>
               </div>
             )}
 
-            {/* Load more history indicator */}
-            {messages.length > 0 && (
+            {/* Load more history indicator - only show if there's actually more history */}
+            {messages.length > 0 && hasMoreHistory && (
               <div className="flex justify-center mb-4">
                 {isLoadingHistory ? (
-                  <div className="flex items-center gap-2 text-slate-500 text-sm">
-                    <div className="w-4 h-4 border-2 border-slate-300 border-t-blue-500 rounded-full animate-spin" />
+                  <div className="flex items-center gap-2 text-ink-500 text-sm">
+                    <div className="w-4 h-4 border-2 border-canvas-400 border-t-vermillion-600 rounded-full animate-spin" />
                     Loading older messages...
                   </div>
-                ) : hasMoreHistory ? (
+                ) : (
                   <button
                     onClick={loadHistory}
-                    className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
+                    className="text-sm text-vermillion-700 hover:text-vermillion-800 hover:underline"
                   >
                     Load older messages
                   </button>
-                ) : (
-                  <span className="text-xs text-slate-400">Beginning of conversation</span>
                 )}
               </div>
             )}
@@ -424,8 +422,8 @@ export default function RoomPage() {
             }
             if (typingNames.length === 0) return null
             return (
-              <div className="flex-shrink-0 px-4 py-2 bg-amber-50 border-t border-amber-200">
-                <span className="text-xs text-amber-700">
+              <div className="flex-shrink-0 px-4 py-2 bg-bronze-50 border-t border-bronze-200">
+                <span className="text-xs text-bronze-700">
                   {typingNames.join(', ')}{' '}
                   {typingNames.length === 1 ? 'is' : 'are'} typing...
                 </span>
@@ -434,7 +432,7 @@ export default function RoomPage() {
           })()}
 
           {/* Input */}
-          <div className="flex-shrink-0 border-t border-slate-200 px-4 py-3 bg-white">
+          <div className="flex-shrink-0 border-t border-canvas-300 px-4 py-3 bg-canvas-200">
             <RoomChatInput
               onSend={handleSend}
               onTyping={sendTyping}

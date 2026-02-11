@@ -63,24 +63,24 @@ function PollDisplayInner({ poll, userId, onVote, onClose }: PollDisplayProps) {
   }
 
   return (
-    <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden my-2 max-w-md">
+    <div className="bg-canvas-100 border border-canvas-300 rounded-sm shadow-sm overflow-hidden my-2 max-w-md">
       {/* Header */}
-      <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-start gap-2">
+      <div className="px-4 py-3 bg-canvas-200 border-b border-canvas-300 flex items-start gap-2">
         <span className="text-lg">📊</span>
         <div className="flex-1 min-w-0">
-          <h3 className="font-medium text-slate-900 text-sm">{poll.question}</h3>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <h3 className="font-medium text-ink-900 text-sm">{poll.question}</h3>
+          <p className="text-xs text-ink-500 mt-0.5">
             by {poll.creator_name} · {totalVotes} vote{totalVotes !== 1 ? 's' : ''}
             {poll.allow_multiple && ' · Multiple choice'}
           </p>
         </div>
         {poll.mandatory && isOpen && (
-          <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full">
+          <span className="px-2 py-0.5 bg-vermillion-100 text-vermillion-700 text-xs rounded-sm">
             Required
           </span>
         )}
         {!isOpen && (
-          <span className="px-2 py-0.5 bg-slate-200 text-slate-600 text-xs rounded-full">
+          <span className="px-2 py-0.5 bg-canvas-300 text-ink-600 text-xs rounded-sm">
             Closed
           </span>
         )}
@@ -99,18 +99,18 @@ function PollDisplayInner({ poll, userId, onVote, onClose }: PollDisplayProps) {
               <button
                 onClick={() => handleOptionClick(opt.id)}
                 disabled={!isOpen || hasVoted}
-                className={`w-full text-left p-2 rounded-md border transition-all relative overflow-hidden ${
+                className={`w-full text-left p-2 rounded-sm border transition-all relative overflow-hidden ${
                   isSelected
-                    ? 'border-blue-500 bg-blue-50'
+                    ? 'border-vermillion-500 bg-vermillion-50'
                     : wasVoted
-                    ? 'border-green-500 bg-green-50'
-                    : 'border-slate-200 hover:border-slate-300'
+                    ? 'border-jade-500 bg-jade-50'
+                    : 'border-canvas-300 hover:border-canvas-400'
                 } ${(!isOpen || hasVoted) && !wasVoted ? 'opacity-75' : ''}`}
               >
                 {/* Background bar showing percentage - always visible for real-time results */}
                 {totalVotes > 0 && (
                   <div
-                    className={`absolute inset-0 ${wasVoted ? 'bg-green-100' : 'bg-slate-100'}`}
+                    className={`absolute inset-0 ${wasVoted ? 'bg-jade-100' : 'bg-canvas-200'}`}
                     style={{ width: `${percentage}%` }}
                   />
                 )}
@@ -121,8 +121,8 @@ function PollDisplayInner({ poll, userId, onVote, onClose }: PollDisplayProps) {
                       <span
                         className={`w-4 h-4 rounded border flex items-center justify-center text-xs ${
                           isSelected || wasVoted
-                            ? 'bg-blue-500 border-blue-500 text-white'
-                            : 'border-slate-300'
+                            ? 'bg-vermillion-600 border-vermillion-600 text-white'
+                            : 'border-canvas-400'
                         }`}
                       >
                         {(isSelected || wasVoted) && '✓'}
@@ -131,27 +131,27 @@ function PollDisplayInner({ poll, userId, onVote, onClose }: PollDisplayProps) {
                       <span
                         className={`w-4 h-4 rounded-full border flex items-center justify-center ${
                           isSelected || wasVoted
-                            ? 'border-blue-500'
-                            : 'border-slate-300'
+                            ? 'border-vermillion-600'
+                            : 'border-canvas-400'
                         }`}
                       >
                         {(isSelected || wasVoted) && (
-                          <span className="w-2 h-2 bg-blue-500 rounded-full" />
+                          <span className="w-2 h-2 bg-vermillion-600 rounded-full" />
                         )}
                       </span>
                     )}
-                    <span className="text-sm text-slate-800">{opt.text}</span>
+                    <span className="text-sm text-ink-800">{opt.text}</span>
                   </div>
                   {/* Always show vote counts in real-time */}
                   {totalVotes > 0 && (
-                    <span className="text-xs text-slate-500">
+                    <span className="text-xs text-ink-500">
                       {voteCount} ({percentage.toFixed(0)}%)
                     </span>
                   )}
                 </div>
 
                 {opt.description && (
-                  <p className="relative text-xs text-slate-500 mt-1 ml-6">
+                  <p className="relative text-xs text-ink-500 mt-1 ml-6">
                     {opt.description}
                   </p>
                 )}
@@ -159,7 +159,7 @@ function PollDisplayInner({ poll, userId, onVote, onClose }: PollDisplayProps) {
 
               {/* Show voters - always visible for real-time feedback */}
               {opt.votes.length > 0 && !poll.anonymous && (
-                <div className="mt-1 ml-6 text-xs text-slate-400">
+                <div className="mt-1 ml-6 text-xs text-ink-400">
                   {opt.votes.slice(0, 3).map((v, i) => (
                     <span key={v.voter_id}>
                       {i > 0 && ', '}
@@ -184,12 +184,12 @@ function PollDisplayInner({ poll, userId, onVote, onClose }: PollDisplayProps) {
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder="Why this choice? (optional)"
-              className="w-full px-2 py-1 text-sm border border-slate-200 rounded focus:outline-none focus:border-blue-400"
+              className="w-full px-2 py-1 text-sm border border-canvas-300 rounded-sm focus:outline-none focus:border-ink-500 bg-white"
             />
           ) : (
             <button
               onClick={() => setShowReason(true)}
-              className="text-xs text-slate-500 hover:text-slate-700"
+              className="text-xs text-ink-500 hover:text-ink-700"
             >
               + Add reasoning
             </button>
@@ -197,7 +197,7 @@ function PollDisplayInner({ poll, userId, onVote, onClose }: PollDisplayProps) {
           <button
             onClick={handleVote}
             disabled={selectedOptions.size === 0}
-            className="w-full py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:hover:bg-blue-600 text-white text-sm font-medium rounded transition-colors"
+            className="w-full py-1.5 bg-ink-800 hover:bg-ink-700 disabled:opacity-50 disabled:hover:bg-ink-800 text-white text-sm font-medium rounded-sm transition-colors"
           >
             Vote
           </button>
@@ -205,10 +205,10 @@ function PollDisplayInner({ poll, userId, onVote, onClose }: PollDisplayProps) {
       )}
 
       {isOpen && isCreator && (
-        <div className="px-3 pb-3 border-t border-slate-100 pt-2">
+        <div className="px-3 pb-3 border-t border-canvas-200 pt-2">
           <button
             onClick={() => onClose(poll.poll_id)}
-            className="text-xs text-slate-500 hover:text-slate-700"
+            className="text-xs text-ink-500 hover:text-ink-700"
           >
             Close poll
           </button>

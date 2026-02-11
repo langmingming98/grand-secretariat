@@ -90,17 +90,16 @@ export function parseMentions(text: string): TextSegment[] {
  * Avatar color utilities
  */
 
+// Chinese-themed avatar colors matching our design system
 const AVATAR_COLORS = [
-  'bg-blue-500',
-  'bg-green-500',
-  'bg-purple-500',
-  'bg-orange-500',
-  'bg-pink-500',
-  'bg-teal-500',
-  'bg-indigo-500',
-  'bg-red-500',
-  'bg-cyan-500',
-  'bg-amber-500',
+  'bg-vermillion-600',  // 朱红 - Vermillion (primary)
+  'bg-jade-600',        // 翠玉 - Jade green
+  'bg-bronze-600',      // 古铜 - Bronze
+  'bg-ink-700',         // 墨色 - Ink black
+  'bg-vermillion-500',  // Lighter vermillion
+  'bg-jade-500',        // Lighter jade
+  'bg-bronze-500',      // Lighter bronze
+  'bg-ink-600',         // Lighter ink
 ]
 
 /**

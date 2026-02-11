@@ -44,14 +44,15 @@ _config = load_config()
 ROOM_SERVICE_ADDRESS = _config.room_service.address
 CHAT_SERVICE_ADDRESS = _config.chat_service.address
 
-# Fast models for room config generation
-GENERATOR_MODEL = "z-ai/glm-4.7-flash"
+# Fast model for room config generation (must support structured JSON output)
+GENERATOR_MODEL = "openai/gpt-4o-mini"
 
 # Available models for AI to assign (fast, capable models)
 AVAILABLE_MODELS = [
-    {"id": "anthropic/claude-3.5-haiku", "name": "Claude 3.5 Haiku", "strengths": "fast, balanced, good at following instructions"},
-    {"id": "openai/gpt-4o-mini", "name": "GPT-4o Mini", "strengths": "fast, creative, broad knowledge"},
-    {"id": "google/gemini-2.5-flash-lite-preview-09-2025", "name": "Gemini 2.5 Flash Lite", "strengths": "very fast, analytical, good at structured tasks"},
+    {"id": "anthropic/claude-sonnet-4", "name": "Claude Sonnet 4", "strengths": "balanced, thoughtful, good at nuanced discussion"},
+    {"id": "openai/gpt-4.1-mini", "name": "GPT-4.1 Mini", "strengths": "fast, creative, broad knowledge"},
+    {"id": "google/gemini-2.5-flash", "name": "Gemini 2.5 Flash", "strengths": "very fast, analytical, good at structured tasks"},
+    {"id": "x-ai/grok-3-mini", "name": "Grok 3 Mini", "strengths": "fast, witty, unconventional perspectives"},
 ]
 
 ROOM_CONFIG_SYSTEM_PROMPT = """You are a room configuration assistant. Given a user's description of the room they want to create, generate a structured JSON configuration.

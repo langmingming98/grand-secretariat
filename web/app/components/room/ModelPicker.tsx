@@ -95,12 +95,12 @@ function ModelPickerInner({
           placeholder={placeholder}
           autoFocus={autoFocus}
           onKeyDown={handleKeyDown}
-          className="flex-1 px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:border-blue-500"
+          className="flex-1 px-3 py-2 bg-white border border-canvas-400 rounded-sm text-sm text-ink-900 placeholder-ink-400 focus:outline-none focus:border-ink-500"
         />
         {onCancel && (
           <button
             onClick={onCancel}
-            className="px-3 py-2 text-sm text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+            className="px-3 py-2 text-sm text-ink-500 hover:text-ink-900 hover:bg-canvas-200 rounded-sm transition-colors"
           >
             Cancel
           </button>
@@ -109,11 +109,11 @@ function ModelPickerInner({
 
       {/* Selected model chip */}
       {showSelectedChip && selectedModel && (
-        <div className="mt-1 px-2 py-1 bg-blue-50 border border-blue-200 rounded text-xs text-blue-800 flex items-center justify-between">
+        <div className="mt-1 px-2 py-1 bg-canvas-200 border border-canvas-400 rounded-sm text-xs text-ink-800 flex items-center justify-between">
           <span className="truncate">{selectedModel}</span>
           <button
             onClick={handleClear}
-            className="ml-1 text-blue-500 hover:text-blue-700 flex-shrink-0"
+            className="ml-1 text-ink-500 hover:text-ink-700 flex-shrink-0"
             title="Clear selection"
           >
             &times;
@@ -123,11 +123,11 @@ function ModelPickerInner({
 
       {/* Results dropdown */}
       {searchQuery && !selectedModel && (
-        <div className="mt-1 max-h-32 overflow-y-auto border border-gray-200 rounded bg-white z-10">
+        <div className="mt-1 max-h-32 overflow-y-auto border border-canvas-300 rounded-sm bg-white z-10">
           {loading ? (
-            <div className="px-2 py-1 text-xs text-gray-500">Loading...</div>
+            <div className="px-2 py-1 text-xs text-ink-500">Loading...</div>
           ) : filteredResults.length === 0 ? (
-            <div className="px-2 py-1 text-xs text-gray-500">
+            <div className="px-2 py-1 text-xs text-ink-500">
               {results.length > 0 ? 'All matching models already added' : 'No models found'}
             </div>
           ) : (
@@ -138,10 +138,10 @@ function ModelPickerInner({
                   onSelect(m)
                   setSearchQuery('')
                 }}
-                className="w-full text-left px-2 py-1.5 text-xs text-gray-900 hover:bg-gray-100 transition-colors border-b border-gray-100 last:border-b-0"
+                className="w-full text-left px-2 py-1.5 text-xs text-ink-900 hover:bg-canvas-200 transition-colors border-b border-canvas-200 last:border-b-0"
               >
                 <div className="font-medium truncate">{m.name || modelIdToDisplayName(m.id)}</div>
-                <div className="text-gray-500 truncate">{m.id}</div>
+                <div className="text-ink-500 truncate">{m.id}</div>
               </button>
             ))
           )}

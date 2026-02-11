@@ -127,11 +127,11 @@ function MessageRowInner({
   return (
     <div
       ref={messageRef}
-      className="group flex gap-3 px-4 py-1.5 hover:bg-slate-50 transition-colors"
+      className="group flex gap-3 px-4 py-1.5 hover:bg-canvas-200/50 transition-colors"
     >
       {/* Avatar with tooltip */}
       <div
-        className={`w-9 h-9 rounded ${emojiAvatar ? 'bg-slate-100' : avatarBg} flex-shrink-0 flex items-center justify-center ${emojiAvatar ? 'text-xl' : 'text-white text-sm font-medium'} cursor-default`}
+        className={`w-9 h-9 rounded-sm ${emojiAvatar ? 'bg-canvas-200' : avatarBg} flex-shrink-0 flex items-center justify-center ${emojiAvatar ? 'text-xl' : 'text-white text-sm font-medium'} cursor-default`}
         title={buildTooltip()}
       >
         {emojiAvatar || avatarLetter}
@@ -149,24 +149,24 @@ function MessageRowInner({
               onChange={(e) => setEditValue(e.target.value)}
               onBlur={handleNameSave}
               onKeyDown={handleKeyDown}
-              className="text-sm font-bold text-blue-700 bg-blue-50 border border-blue-300 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="text-sm font-bold text-vermillion-700 bg-vermillion-50 border border-vermillion-300 rounded-sm px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-vermillion-500"
               style={{ width: `${Math.max(editValue.length, 4) + 2}ch` }}
             />
           ) : (
             <span
-              className={`text-sm font-bold ${isLLM ? 'text-blue-700 cursor-pointer hover:underline' : 'text-slate-900'}`}
+              className={`text-sm font-bold ${isLLM ? 'text-vermillion-700 cursor-pointer hover:underline' : 'text-ink-900'}`}
               onClick={handleNameClick}
               title={isLLM && onUpdateLLM ? 'Click to edit name' : undefined}
             >
               {displayName}
             </span>
           )}
-          <span className="text-xs text-slate-500">
+          <span className="text-xs text-ink-500">
             {formatTime(message.timestamp)}
           </span>
           <button
             onClick={() => onReply(message.id)}
-            className="text-xs text-slate-400 hover:text-slate-700 opacity-0 group-hover:opacity-100 transition-opacity ml-2"
+            className="text-xs text-ink-400 hover:text-ink-700 opacity-0 group-hover:opacity-100 transition-opacity ml-2"
           >
             Reply
           </button>
@@ -181,9 +181,9 @@ function MessageRowInner({
         )}
 
         {/* Message content */}
-        <div className={`text-sm text-slate-800 ${isLLM ? 'prose prose-sm max-w-none prose-slate' : ''}`}>
+        <div className={`text-sm text-ink-800 ${isLLM ? 'prose prose-sm max-w-none' : ''}`}>
           {isEmpty ? (
-            <span className="text-xs italic text-amber-600 bg-amber-50 px-2 py-1 rounded">
+            <span className="text-xs italic text-bronze-700 bg-bronze-50 px-2 py-1 rounded-sm">
               (empty response - LLM chose not to reply)
             </span>
           ) : isLLM ? (
@@ -196,7 +196,7 @@ function MessageRowInner({
                 segment.type === 'mention' ? (
                   <span
                     key={i}
-                    className="bg-blue-100 text-blue-700 px-1 rounded font-medium"
+                    className="bg-vermillion-100 text-vermillion-700 px-1 rounded-sm font-medium"
                   >
                     {convertEmojiShortcodes(segment.content)}
                   </span>

@@ -65,9 +65,9 @@ function StreamingRowInner({
   }
 
   return (
-    <div className="group flex gap-3 px-4 py-1.5 bg-blue-50/50">
+    <div className="group flex gap-3 px-4 py-1.5 bg-vermillion-50/50">
       {/* Avatar */}
-      <div className={`w-9 h-9 rounded ${avatarBg} flex-shrink-0 flex items-center justify-center text-white text-sm font-medium`}>
+      <div className={`w-9 h-9 rounded-sm ${avatarBg} flex-shrink-0 flex items-center justify-center text-white text-sm font-medium`}>
         {avatarLetter}
       </div>
 
@@ -75,17 +75,17 @@ function StreamingRowInner({
       <div className="flex-1 min-w-0">
         {/* Header */}
         <div className="flex items-baseline gap-2">
-          <span className="text-sm font-bold text-blue-700">
+          <span className="text-sm font-bold text-vermillion-700">
             {displayName}
           </span>
           {/* In stream mode, show typing indicator in the row */}
           {!isSlackMode && is_thinking && (
-            <span className="text-xs text-amber-600 animate-pulse">
+            <span className="text-xs text-bronze-600 animate-pulse">
               thinking...
             </span>
           )}
           {!isSlackMode && !is_thinking && content && (
-            <span className="text-xs text-blue-500 animate-pulse">
+            <span className="text-xs text-vermillion-500 animate-pulse">
               typing...
             </span>
           )}
@@ -99,7 +99,7 @@ function StreamingRowInner({
 
         {/* Content */}
         {displayContent ? (
-          <div className="text-sm text-slate-800 prose prose-sm max-w-none prose-slate">
+          <div className="text-sm text-ink-800 prose prose-sm max-w-none">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{displayContent}</ReactMarkdown>
           </div>
         ) : null}
@@ -107,9 +107,9 @@ function StreamingRowInner({
         {/* Typing indicator (bouncing dots) - only in stream mode */}
         {!isSlackMode && is_thinking && !content && (
           <div className="flex gap-1 py-1">
-            <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-            <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-            <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+            <span className="w-1.5 h-1.5 bg-ink-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+            <span className="w-1.5 h-1.5 bg-ink-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+            <span className="w-1.5 h-1.5 bg-ink-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
           </div>
         )}
       </div>

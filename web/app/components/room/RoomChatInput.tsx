@@ -138,16 +138,16 @@ function RoomChatInputInner({
     <div className="relative">
       {/* Reply bar */}
       {replyTo && replyToMessage && (
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 border border-slate-300 rounded-t-lg text-xs text-slate-600 -mb-px">
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-canvas-300 border border-canvas-400 rounded-t-sm text-xs text-ink-600 -mb-px">
           <span>
-            Replying to <span className="font-medium text-slate-900">{replyToMessage.sender.name}</span>
+            Replying to <span className="font-medium text-ink-900">{replyToMessage.sender.name}</span>
           </span>
-          <span className="text-slate-500 truncate flex-1">
+          <span className="text-ink-500 truncate flex-1">
             {replyToMessage.content.slice(0, 60)}
           </span>
           <button
             onClick={onCancelReply}
-            className="text-slate-500 hover:text-slate-900 ml-auto flex-shrink-0"
+            className="text-ink-500 hover:text-ink-900 ml-auto flex-shrink-0"
           >
             &times;
           </button>
@@ -156,28 +156,28 @@ function RoomChatInputInner({
 
       {/* Mention dropdown */}
       {showMentions && filtered.length > 0 && (
-        <div className="absolute bottom-full mb-1 left-0 bg-white border border-slate-300 rounded-lg overflow-hidden shadow-lg max-h-48 overflow-y-auto">
+        <div className="absolute bottom-full mb-1 left-0 bg-white border border-canvas-400 rounded-sm overflow-hidden shadow-lg max-h-48 overflow-y-auto">
           {filtered.map((entry, idx) => (
             <button
               key={`${entry.type}-${entry.id}`}
               onClick={() => insertMention(entry.mentionText)}
-              className={`block w-full text-left px-3 py-2 text-sm text-slate-800 transition-colors ${
-                idx === highlightedIndex ? 'bg-slate-100' : 'hover:bg-slate-100'
+              className={`block w-full text-left px-3 py-2 text-sm text-ink-800 transition-colors ${
+                idx === highlightedIndex ? 'bg-canvas-200' : 'hover:bg-canvas-200'
               }`}
             >
               <span
                 className={
                   entry.type === 'llm'
-                    ? 'text-blue-400'
+                    ? 'text-vermillion-600'
                     : entry.type === 'special'
-                    ? 'text-yellow-400'
-                    : 'text-green-400'
+                    ? 'text-bronze-600'
+                    : 'text-jade-600'
                 }
               >
                 @{entry.label}
               </span>
               {entry.sublabel && (
-                <span className="text-slate-500 ml-2 text-xs">
+                <span className="text-ink-500 ml-2 text-xs">
                   {entry.sublabel}
                 </span>
               )}
@@ -195,19 +195,19 @@ function RoomChatInputInner({
       >
         {/* Input container with highlight overlay */}
         <div
-          className={`flex-1 relative bg-white border border-slate-300 focus-within:border-blue-500 ${
-            replyTo ? 'rounded-b-lg rounded-t-none' : 'rounded-lg'
+          className={`flex-1 relative bg-white border border-canvas-400 focus-within:border-ink-500 ${
+            replyTo ? 'rounded-b-sm rounded-t-none' : 'rounded-sm'
           }`}
         >
           {/* Highlight overlay - shows background highlights under the input text */}
           <div
-            className="absolute inset-0 px-3 py-2 pointer-events-none overflow-hidden whitespace-pre"
+            className="absolute inset-0 px-3 py-3 pointer-events-none overflow-hidden whitespace-pre text-sm"
             style={{ color: 'transparent' }}
             aria-hidden="true"
           >
             {parseMentions(message).map((segment, i) =>
               segment.type === 'mention' ? (
-                <span key={i} className="bg-blue-200 rounded">
+                <span key={i} className="bg-vermillion-200 rounded-sm">
                   {segment.content}
                 </span>
               ) : (
@@ -238,13 +238,13 @@ function RoomChatInputInner({
             }}
             placeholder="Type a message... (use @ to mention)"
             disabled={disabled}
-            className="w-full px-3 py-2 bg-transparent text-slate-900 placeholder-slate-500 focus:outline-none disabled:opacity-50 relative"
+            className="w-full px-3 py-3 bg-transparent text-sm text-ink-900 placeholder-ink-400 focus:outline-none disabled:opacity-50 relative"
           />
         </div>
         <button
           type="submit"
           disabled={!message.trim() || disabled}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:hover:bg-blue-600 rounded-lg text-sm font-medium text-white transition-colors"
+          className="btn-ink disabled:opacity-50"
         >
           Send
         </button>

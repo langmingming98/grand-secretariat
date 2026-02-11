@@ -3,8 +3,7 @@
 import { useState, memo, useCallback } from 'react'
 import { modelIdToDisplayName, modelIdToShortId } from '../../lib/utils'
 import { ModelPicker } from './ModelPicker'
-import type { LLMInfo, OpenRouterModel, ChatStyleId } from './types'
-import { PERSONA_PRESETS, CHAT_STYLES } from './types'
+import type { LLMInfo, OpenRouterModel } from './types'
 
 interface AddLLMFormProps {
   existingLLMs: LLMInfo[]
@@ -14,7 +13,6 @@ interface AddLLMFormProps {
     persona: string
     display_name: string
     title?: string
-    chat_style?: number
   }) => void
   onCancel: () => void
 }
@@ -24,7 +22,6 @@ function AddLLMFormInner({ existingLLMs, onAdd, onCancel }: AddLLMFormProps) {
   const [name, setName] = useState('')
   const [persona, setPersona] = useState('')
   const [title, setTitle] = useState('')
-  const [chatStyle, setChatStyle] = useState<ChatStyleId>(1)  // Default to conversational (Slack mode)
 
   const handleSubmit = useCallback(() => {
     if (!model.trim() || !name.trim()) return
@@ -44,9 +41,8 @@ function AddLLMFormInner({ existingLLMs, onAdd, onCancel }: AddLLMFormProps) {
       display_name: name.trim(),
       persona: persona.trim() || `You are ${name.trim()}, a helpful AI assistant.`,
       title: title.trim() || undefined,
-      chat_style: chatStyle,
     })
-  }, [model, name, persona, title, chatStyle, existingLLMs, onAdd])
+  }, [model, name, persona, title, existingLLMs, onAdd])
 
   const handleModelSelect = useCallback(
     (m: OpenRouterModel) => {
@@ -59,82 +55,51 @@ function AddLLMFormInner({ existingLLMs, onAdd, onCancel }: AddLLMFormProps) {
   )
 
   return (
-    <div className="mb-3 p-2 bg-white rounded border border-gray-300 space-y-1.5">
-      <input
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        placeholder="Display name"
-        className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-xs text-gray-900 placeholder-gray-500 focus:outline-none focus:border-blue-500"
-      />
+    <div className="mb-3 p-2 bg-canvas-100 rounded-sm border border-canvas-300">
+      <div className="space-y-2">
+        <ModelPicker
+          selectedModel={model || null}
+          onSelect={handleModelSelect}
+          placeholder="Search model..."
+          showSelectedChip={true}
+          excludeModels={existingLLMs.map((l) => l.model)}
+        />
 
-      <ModelPicker
-        selectedModel={model || null}
-        onSelect={handleModelSelect}
-        placeholder="Search model..."
-        showSelectedChip={true}
-        excludeModels={existingLLMs.map((l) => l.model)}
-      />
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Display name"
+          className="w-full px-2 py-1.5 bg-white border-0 border-b border-canvas-300 text-xs text-ink-900 placeholder-ink-400 focus:outline-none focus:border-ink-500"
+        />
 
-      <input
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        placeholder="Title (optional)"
-        className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-xs text-gray-900 placeholder-gray-500 focus:outline-none focus:border-blue-500"
-      />
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Title (optional)"
+          className="w-full px-2 py-1.5 bg-white border-0 border-b border-canvas-300 text-xs text-ink-900 placeholder-ink-400 focus:outline-none focus:border-ink-500"
+        />
 
-      {/* Chat style selector */}
-      <div>
-        <label className="text-[10px] text-gray-500 block mb-1">Response Style</label>
-        <div className="flex flex-wrap gap-1">
-          {CHAT_STYLES.map((style) => (
-            <button
-              key={style.id}
-              type="button"
-              onClick={() => setChatStyle(style.id as ChatStyleId)}
-              className={`px-1.5 py-0.5 text-[10px] rounded border transition-colors ${
-                chatStyle === style.id
-                  ? 'border-blue-500 bg-blue-50 text-blue-700'
-                  : 'border-gray-200 hover:border-blue-400 hover:bg-blue-50 text-gray-600'
-              }`}
-              title={style.description}
-            >
-              {style.label}
-            </button>
-          ))}
-        </div>
+        <textarea
+          value={persona}
+          onChange={(e) => setPersona(e.target.value)}
+          placeholder="Persona (optional)"
+          rows={2}
+          className="w-full px-2 py-1.5 bg-white border border-canvas-300 rounded-sm text-xs text-ink-900 placeholder-ink-400 focus:outline-none focus:border-ink-500 resize-none"
+        />
       </div>
 
-      {/* Persona presets */}
-      <div className="flex flex-wrap gap-1">
-        {PERSONA_PRESETS.map((preset) => (
-          <button
-            key={preset.id}
-            type="button"
-            onClick={() => setPersona(preset.template.replace('{name}', name || 'Assistant'))}
-            className="px-1.5 py-0.5 text-[10px] rounded border border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-colors text-gray-600"
-          >
-            {preset.label}
-          </button>
-        ))}
-      </div>
-
-      <textarea
-        value={persona}
-        onChange={(e) => setPersona(e.target.value)}
-        placeholder="Persona (optional) - describe how this LLM should behave"
-        rows={4}
-        className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-xs text-gray-900 placeholder-gray-500 focus:outline-none focus:border-blue-500 resize-y min-h-[80px]"
-      />
-
-      <div className="flex gap-1">
+      <div className="flex gap-2 mt-3">
         <button
           onClick={handleSubmit}
           disabled={!model.trim() || !name.trim()}
-          className="flex-1 px-2 py-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded text-xs text-white"
+          className="flex-1 py-1.5 bg-ink-800 hover:bg-ink-700 disabled:opacity-50 rounded-sm text-xs text-white font-medium"
         >
           Add
         </button>
-        <button onClick={onCancel} className="px-2 py-1 text-xs text-gray-500 hover:text-gray-800">
+        <button
+          onClick={onCancel}
+          className="py-1.5 px-3 text-xs text-ink-500 hover:text-ink-800"
+        >
           Cancel
         </button>
       </div>

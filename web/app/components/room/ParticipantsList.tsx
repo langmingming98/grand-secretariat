@@ -93,21 +93,21 @@ function ParticipantsListInner({
               <span
                 className={`w-2 h-2 rounded-full flex-shrink-0 mt-1.5 ${
                   !e.isOnline
-                    ? 'bg-slate-300'
+                    ? 'bg-canvas-400'
                     : e.isStreaming
-                    ? 'bg-yellow-400 animate-pulse'
+                    ? 'bg-bronze-400 animate-pulse'
                     : e.type === 'llm'
-                    ? 'bg-blue-400'
-                    : 'bg-green-500'
+                    ? 'bg-vermillion-400'
+                    : 'bg-jade-500'
                 }`}
                 title={e.isOnline ? 'Online' : 'Offline'}
               />
 
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1">
-                  <span className="text-sm text-slate-800 truncate">
+                  <span className="text-sm text-ink-800 truncate">
                     {e.name}
-                    {e.isSelf && <span className="text-slate-500 ml-1">(you)</span>}
+                    {e.isSelf && <span className="text-ink-500 ml-1">(you)</span>}
                   </span>
 
                   {/* LLM action buttons */}
@@ -115,7 +115,7 @@ function ParticipantsListInner({
                     <>
                       <button
                         onClick={() => handleEditLLMClick(e.id)}
-                        className="opacity-0 group-hover/entry:opacity-100 text-slate-500 hover:text-slate-900 transition-opacity flex-shrink-0"
+                        className="opacity-0 group-hover/entry:opacity-100 text-ink-500 hover:text-ink-900 transition-opacity flex-shrink-0"
                         title="Edit LLM"
                       >
                         <svg
@@ -141,7 +141,7 @@ function ParticipantsListInner({
                       </button>
                       <button
                         onClick={() => handleRemoveLLM(e.id, e.name)}
-                        className="opacity-0 group-hover/entry:opacity-100 text-slate-400 hover:text-red-600 transition-opacity flex-shrink-0"
+                        className="opacity-0 group-hover/entry:opacity-100 text-ink-400 hover:text-vermillion-600 transition-opacity flex-shrink-0"
                         title="Remove LLM"
                       >
                         <svg
@@ -166,7 +166,7 @@ function ParticipantsListInner({
                   {e.isSelf && (
                     <button
                       onClick={handleEditSelfClick}
-                      className="opacity-0 group-hover/entry:opacity-100 text-slate-500 hover:text-slate-900 transition-opacity flex-shrink-0"
+                      className="opacity-0 group-hover/entry:opacity-100 text-ink-500 hover:text-ink-900 transition-opacity flex-shrink-0"
                       title="Edit your profile"
                     >
                       <svg
@@ -189,12 +189,12 @@ function ParticipantsListInner({
 
                 {/* Title */}
                 {e.title && (
-                  <span className="text-xs font-medium text-slate-700 truncate block">{e.title}</span>
+                  <span className="text-xs font-medium text-ink-700 truncate block">{e.title}</span>
                 )}
 
                 {/* Model name for LLMs */}
                 {e.type === 'llm' && llm && (
-                  <span className="text-[11px] text-slate-400 truncate block">
+                  <span className="text-[11px] text-ink-400 truncate block">
                     {modelIdToDisplayName(llm.model)}
                   </span>
                 )}

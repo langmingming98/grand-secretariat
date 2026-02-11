@@ -60,13 +60,13 @@ function PollCreateModalInner({ onClose, onCreate }: PollCreateModalProps) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-canvas-100 rounded-sm shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto border border-canvas-300">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
-          <h2 className="text-lg font-semibold text-slate-900">Create Poll</h2>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-canvas-300 bg-canvas-200">
+          <h2 className="text-lg font-display font-semibold text-ink-900">Create Poll</h2>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 text-xl"
+            className="text-ink-400 hover:text-ink-700 text-xl"
           >
             ×
           </button>
@@ -76,7 +76,7 @@ function PollCreateModalInner({ onClose, onCreate }: PollCreateModalProps) {
         <div className="p-4 space-y-4">
           {/* Question */}
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
+            <label className="block text-sm font-medium text-ink-700 mb-1">
               Question
             </label>
             <input
@@ -84,14 +84,14 @@ function PollCreateModalInner({ onClose, onCreate }: PollCreateModalProps) {
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
               placeholder="What would you like to ask?"
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-900"
+              className="w-full px-3 py-2 border border-canvas-400 rounded-sm focus:outline-none focus:border-ink-500 text-ink-900 bg-white"
               autoFocus
             />
           </div>
 
           {/* Options */}
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
+            <label className="block text-sm font-medium text-ink-700 mb-1">
               Options
             </label>
             <div className="space-y-2">
@@ -103,20 +103,20 @@ function PollCreateModalInner({ onClose, onCreate }: PollCreateModalProps) {
                       value={opt.text}
                       onChange={(e) => handleOptionChange(idx, 'text', e.target.value)}
                       placeholder={`Option ${idx + 1}`}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm text-slate-900"
+                      className="w-full px-3 py-2 border border-canvas-400 rounded-sm focus:outline-none focus:border-ink-500 text-sm text-ink-900 bg-white"
                     />
                     <input
                       type="text"
                       value={opt.description}
                       onChange={(e) => handleOptionChange(idx, 'description', e.target.value)}
                       placeholder="Description (optional)"
-                      className="w-full px-3 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs text-slate-600"
+                      className="w-full px-3 py-1.5 border border-canvas-300 rounded-sm focus:outline-none focus:border-ink-500 text-xs text-ink-600 bg-white"
                     />
                   </div>
                   {options.length > 2 && (
                     <button
                       onClick={() => handleRemoveOption(idx)}
-                      className="text-slate-400 hover:text-red-500 self-start mt-2"
+                      className="text-ink-400 hover:text-vermillion-600 self-start mt-2"
                     >
                       ×
                     </button>
@@ -127,7 +127,7 @@ function PollCreateModalInner({ onClose, onCreate }: PollCreateModalProps) {
             {options.length < 6 && (
               <button
                 onClick={handleAddOption}
-                className="mt-2 text-sm text-blue-600 hover:text-blue-700"
+                className="mt-2 text-sm text-vermillion-700 hover:text-vermillion-800"
               >
                 + Add option
               </button>
@@ -141,34 +141,34 @@ function PollCreateModalInner({ onClose, onCreate }: PollCreateModalProps) {
                 type="checkbox"
                 checked={mandatory}
                 onChange={(e) => setMandatory(e.target.checked)}
-                className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                className="w-4 h-4 text-vermillion-600 border-canvas-400 rounded focus:ring-vermillion-500 accent-vermillion-600"
               />
-              <span className="text-sm text-slate-700">Required (LLMs must vote)</span>
+              <span className="text-sm text-ink-700">Required (LLMs must vote)</span>
             </label>
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
                 checked={allowMultiple}
                 onChange={(e) => setAllowMultiple(e.target.checked)}
-                className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                className="w-4 h-4 text-vermillion-600 border-canvas-400 rounded focus:ring-vermillion-500 accent-vermillion-600"
               />
-              <span className="text-sm text-slate-700">Allow multiple votes</span>
+              <span className="text-sm text-ink-700">Allow multiple votes</span>
             </label>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end gap-2 px-4 py-3 border-t border-slate-200 bg-slate-50">
+        <div className="flex justify-end gap-2 px-4 py-3 border-t border-canvas-300 bg-canvas-200">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm text-slate-600 hover:text-slate-800"
+            className="px-4 py-2 text-sm text-ink-600 hover:text-ink-900"
           >
             Cancel
           </button>
           <button
             onClick={handleCreate}
             disabled={!canCreate}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:hover:bg-blue-600 text-white text-sm font-medium rounded-lg transition-colors"
+            className="btn-ink disabled:opacity-50"
           >
             Create Poll
           </button>

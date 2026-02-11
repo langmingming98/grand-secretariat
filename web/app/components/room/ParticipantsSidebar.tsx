@@ -172,28 +172,28 @@ function ParticipantsSidebarInner({
   return (
     <div
       ref={sidebarRef}
-      className="flex-shrink-0 border-l border-slate-200 overflow-y-auto bg-slate-50 relative"
+      className="flex-shrink-0 border-l border-canvas-300 overflow-y-auto bg-canvas-200 relative"
       style={{ width: sidebarWidth }}
     >
       {/* Resize handle */}
       <div
         onMouseDown={handleMouseDown}
-        className={`absolute left-0 top-0 bottom-0 w-1 cursor-ew-resize hover:bg-blue-400 transition-colors ${
-          isResizing ? 'bg-blue-400' : 'bg-transparent'
+        className={`absolute left-0 top-0 bottom-0 w-1 cursor-ew-resize hover:bg-vermillion-400 transition-colors ${
+          isResizing ? 'bg-vermillion-400' : 'bg-transparent'
         }`}
         title="Drag to resize"
       />
 
       <div className="p-3">
         {/* Room description */}
-        <div className="mb-4 pb-3 border-b border-slate-200">
-          <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
+        <div className="mb-4 pb-3 border-b border-canvas-300">
+          <h3 className="text-xs font-semibold text-ink-500 uppercase tracking-wider mb-2">
             About
           </h3>
           {isEditingDescription ? (
             <div className="space-y-2">
               <textarea
-                className="w-full text-xs text-slate-600 leading-relaxed border border-slate-300 rounded p-2 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
+                className="w-full text-xs text-ink-600 leading-relaxed border border-canvas-400 rounded-sm p-2 focus:outline-none focus:ring-1 focus:ring-ink-500 resize-none"
                 rows={3}
                 value={descriptionDraft}
                 onChange={(e) => setDescriptionDraft(e.target.value)}
@@ -206,13 +206,13 @@ function ParticipantsSidebarInner({
                     onUpdateRoomDescription?.(descriptionDraft)
                     setIsEditingDescription(false)
                   }}
-                  className="text-xs px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+                  className="text-xs px-2 py-1 bg-ink-800 text-white rounded-sm hover:bg-ink-700"
                 >
                   Save
                 </button>
                 <button
                   onClick={() => setIsEditingDescription(false)}
-                  className="text-xs px-2 py-1 text-slate-500 hover:text-slate-700"
+                  className="text-xs px-2 py-1 text-ink-500 hover:text-ink-700"
                 >
                   Cancel
                 </button>
@@ -220,7 +220,7 @@ function ParticipantsSidebarInner({
             </div>
           ) : (
             <p
-              className="text-xs text-slate-600 leading-relaxed cursor-pointer hover:bg-slate-100 rounded p-1 -m-1"
+              className="text-xs text-ink-600 leading-relaxed cursor-pointer hover:bg-canvas-300 rounded-sm p-1 -m-1 font-serif-tc"
               onClick={() => {
                 setDescriptionDraft(roomDescription || '')
                 setIsEditingDescription(true)
@@ -228,19 +228,19 @@ function ParticipantsSidebarInner({
               title="Click to edit"
             >
               {roomDescription || (
-                <span className="text-slate-400 italic">Click to add description...</span>
+                <span className="text-ink-400 italic font-sans">Click to add description...</span>
               )}
             </p>
           )}
         </div>
 
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+          <h3 className="text-xs font-semibold text-ink-500 uppercase tracking-wider">
             Participants
           </h3>
           <button
             onClick={() => setShowAddLLM(!showAddLLM)}
-            className="text-slate-500 hover:text-slate-900 text-sm leading-none"
+            className="text-ink-500 hover:text-ink-900 text-sm leading-none"
             title="Add LLM"
           >
             +
