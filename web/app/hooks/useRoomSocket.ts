@@ -160,8 +160,6 @@ export function useRoomSocket(roomId: string) {
         RECONNECT_MAX_DELAY
       )
 
-      console.log(`Scheduling reconnect attempt ${attempt} in ${delay}ms`)
-
       reconnectTimerRef.current = setTimeout(() => {
         const params = connectionParamsRef.current
         if (params) {
@@ -197,7 +195,6 @@ export function useRoomSocket(roomId: string) {
       const ws = new WebSocket(wsUrl)
 
       ws.onopen = () => {
-        console.log('WebSocket connected' + (isReconnect ? ' (reconnected)' : ''))
         setState((prev) => ({
           ...prev,
           isConnected: true,
@@ -233,8 +230,7 @@ export function useRoomSocket(roomId: string) {
         // Don't set error here - wait for onclose to handle reconnection
       }
 
-      ws.onclose = (event) => {
-        console.log('WebSocket closed', event.code, event.reason)
+      ws.onclose = () => {
         wsRef.current = null
 
         setState((prev) => ({ ...prev, isConnected: false }))
