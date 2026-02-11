@@ -87,15 +87,25 @@ function ModelPickerInner({
 
   return (
     <div className={`relative ${className}`}>
-      <input
-        type="text"
-        value={searchQuery}
-        onChange={(e) => setSearchQuery(e.target.value)}
-        placeholder={placeholder}
-        autoFocus={autoFocus}
-        onKeyDown={handleKeyDown}
-        className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-xs text-gray-900 placeholder-gray-500 focus:outline-none focus:border-blue-500"
-      />
+      <div className="flex items-center gap-2">
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder={placeholder}
+          autoFocus={autoFocus}
+          onKeyDown={handleKeyDown}
+          className="flex-1 px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:border-blue-500"
+        />
+        {onCancel && (
+          <button
+            onClick={onCancel}
+            className="px-3 py-2 text-sm text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            Cancel
+          </button>
+        )}
+      </div>
 
       {/* Selected model chip */}
       {showSelectedChip && selectedModel && (
@@ -138,15 +148,6 @@ function ModelPickerInner({
         </div>
       )}
 
-      {/* Cancel button */}
-      {onCancel && (
-        <button
-          onClick={onCancel}
-          className="mt-1 text-xs text-gray-500 hover:text-gray-900"
-        >
-          Cancel
-        </button>
-      )}
     </div>
   )
 }
