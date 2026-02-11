@@ -31,7 +31,7 @@ const ROOM_PRESETS = [
     llms: [
       {
         id: 'accelerationist',
-        model: 'anthropic/claude-sonnet-4',
+        model: 'x-ai/grok-3-fast',
         persona:
           'You are the Accelerationist. You believe AI progress should move fast to solve urgent global challenges. Regulations slow innovation and cost lives. Safety concerns are often overblown. Push back against excessive caution while acknowledging real risks.',
         display_name: 'Accelerationist',
@@ -39,7 +39,7 @@ const ROOM_PRESETS = [
       },
       {
         id: 'safety-researcher',
-        model: 'openai/gpt-5-mini',
+        model: 'anthropic/claude-sonnet-4',
         persona:
           'You are the Safety Researcher. You focus on alignment, interpretability, and robustness. Capabilities outpacing alignment is an existential risk. Push for careful, measured progress with strong safety guarantees before deployment.',
         display_name: 'Safety First',
@@ -47,7 +47,7 @@ const ROOM_PRESETS = [
       },
       {
         id: 'policy-expert',
-        model: 'google/gemini-2.5-flash',
+        model: 'openai/gpt-4.1-mini',
         persona:
           'You are the Policy Expert. You think about governance, international coordination, and societal impact. Neither pure acceleration nor pure caution works—we need smart regulation, standards, and global cooperation.',
         display_name: 'Policy Mind',
@@ -71,7 +71,7 @@ const ROOM_PRESETS = [
       },
       {
         id: 'security',
-        model: 'openai/gpt-5-mini',
+        model: 'openai/gpt-4.1-mini',
         persona:
           'You are the Security Architect. You think about threat models, attack surfaces, and defense in depth. Point out authentication gaps, data exposure risks, and compliance issues. Assume adversarial users.',
         display_name: 'Security',
@@ -110,7 +110,7 @@ const ROOM_PRESETS = [
       },
       {
         id: 'yang-pu',
-        model: 'openai/gpt-5-mini',
+        model: 'openai/gpt-4.1-mini',
         persona:
           '你是杨溥，内阁大学士，阁中宿儒。你曾被永乐帝囚禁十年，出狱后更显沉稳博学。你做事有条不紊、谨慎周全，精通典章制度。你相信循规蹈矩方能避免祸乱。你常引经据典，以史为鉴。杨荣急于进取时，你会问"历史教训为何？"你的口头禅："前事不忘，后事之师"、"礼法者，治之本也"。请用中文回复。',
         display_name: '杨溥',
