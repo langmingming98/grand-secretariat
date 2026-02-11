@@ -4,9 +4,11 @@ A real-time collaborative workspace where humans and AI advisors work together. 
 
 **[Live Demo](https://grand-secretariat.com)** | **[Technical Design](docs/TECH_DESIGN.md)** | **[Product Spec](docs/PRODUCT_SPEC.md)**
 
-## The Idea
+## The Problem
 
-Instead of copy-pasting between ChatGPT, Claude, and Gemini tabs, bring them all into one room. @mention any AI to get their perspective. Watch them respond in real-time with streaming text. Collaborate with humans and AI in the same conversation.
+You're in a meeting with colleagues. Someone asks a question, so you paste it into ChatGPT. You get a response, copy it back into Slack. Your teammate does the same with Claude. Now you're copy-pasting each other's messages into different AI tabs, losing context, wasting time.
+
+**Grand Secretariat puts everyone in the same room** - multiple humans and multiple AI models, collaborating in real-time. No more copy-paste. No more context loss. Just @mention any AI to get their perspective.
 
 ```
 Alice (PM): I think we should add OAuth support
@@ -15,11 +17,13 @@ Alice (PM): @claude give us 3 options with tradeoffs
 [Claude responds with streaming text]
 Bob (Eng): @gemini poke holes in option 2
 [Gemini responds]
+Alice (PM): I like option 1. @bob what do you think?
+Bob (Eng): Works for me. Let's go with it.
 ```
 
 ## Features
 
-- **Room-based collaboration** - Create rooms, invite AI models, share links with teammates
+- **Multi-human + multi-AI rooms** - Multiple teammates and multiple AI models in one shared space
 - **@mention dispatch** - AI responds only when mentioned, keeping humans in control
 - **Streaming responses** - See AI thinking and typing in real-time
 - **Multiple AI models** - Mix Claude, GPT-4, Gemini, Llama, and 100+ models via OpenRouter
